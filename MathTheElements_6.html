@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Math: The Elements</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{height:100%;width:100%;overflow:hidden;background:#050300}
+body{font-family:'Palatino Linotype','Book Antiqua',Palatino,serif;color:#FFE4B5}
+#app{position:fixed;inset:0;overflow:hidden}
+button{font-family:inherit;cursor:pointer;border:none;outline:none}
+input{font-family:inherit;outline:none}
+@keyframes floatUp{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.06);opacity:.85}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes dmgFloat{0%{opacity:1;transform:translateY(0) scale(1.3)}100%{opacity:0;transform:translateY(-55px) scale(0.8)}}
+@keyframes monsterBob{0%,100%{transform:scaleX(-1) translateY(0)}50%{transform:scaleX(-1) translateY(-6px)}}
+@keyframes staffSwing{0%,100%{transform:rotate(-20deg)}50%{transform:rotate(20deg)}}
+@keyframes fistPunch{0%,100%{transform:scaleX(-1) translateX(0)}50%{transform:scaleX(-1) translateX(-14px)}}
+@keyframes leafFall{0%{transform:translateY(-5px) rotate(0deg);opacity:.8}100%{transform:translateY(65px) rotate(200deg);opacity:0}}
+@keyframes starTwinkle{0%,100%{opacity:.2}50%{opacity:.9}}
+@keyframes titleGlow{0%,100%{filter:drop-shadow(0 0 10px #FF8C00)}50%{filter:drop-shadow(0 0 25px #FFD700)}}
+@keyframes guardianFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.hbar-label{display:flex;justify-content:space-between;font-size:11px;color:#aaa;margin-bottom:3px}
+.hbar-track{background:rgba(0,0,0,.6);border-radius:6px;height:11px;border:1px solid rgba(255,255,255,.15);overflow:hidden}
+.hbar-fill{height:100%;border-radius:6px;transition:width .5s ease}
+.card{background:rgba(8,4,1,.9);border-radius:16px;padding:20px;backdrop-filter:blur(10px)}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:rgba(255,200,100,.3);border-radius:3px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ═══════════════════════════════════
+// AUDIO ENGINE
+// ═══════════════════════════════════
+const SFX=(()=>{
+  let ctx=null,loops=[],ambInt=null;
+  function ac(){
+    if(!ctx)ctx=new(window.AudioContext||window.webkitAudioContext)();
+    if(ctx.state==='suspended')ctx.resume();
+    return ctx;
+  }
+  function tone(freq,type,vol,dur,delay,pan){
+    delay=delay||0;pan=pan||0;
+    try{
+      const c=ac(),o=c.createOscillator(),g=c.createGain();
+      let src=o;
+      if(c.createStereoPanner){const p=c.createStereoPanner();p.pan.value=pan;o.connect(p);p.connect(g);}
+      else o.connect(g);
+      o.type=type;o.frequency.value=freq;
+      g.gain.setValueAtTime(0,c.currentTime+delay);
+      g.gain.linearRampToValueAtTime(vol,c.currentTime+delay+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+delay+dur);
+      g.connect(c.destination);
+      o.start(c.currentTime+delay);
+      o.stop(c.currentTime+delay+dur+0.05);
+    }catch(e){}
+  }
+  function stopAll(){loops.forEach(l=>{try{clearInterval(l)}catch(e){}});loops=[];clearInterval(ambInt);}
+  function explore(){
+    stopAll();
+    const mel=[261.6,329.6,392,523.2,392,329.6,261.6,293.7];
+    let i=0;
+    const iv=setInterval(()=>{
+      tone(mel[i%mel.length],'sine',0.055,0.45,0,-0.3);
+      tone(mel[(i+2)%mel.length]*0.5,'triangle',0.035,0.65,0.12,0.3);
+      if(i%4===0)tone(130.8,'sine',0.04,0.9);
+      if(i%8===0)tone(196,'sine',0.03,0.7,0.2);
+      i++;
+    },440);
+    loops.push(iv);
+    ambInt=setInterval(()=>{
+      tone(180+Math.random()*80,'sine',0.012,1.4,0,(Math.random()-.5)*.6);
+    },900);
+  }
+  function battle(){
+    stopAll();
+    const riff=[220,246.9,220,196,220,261.6,246.9,220];
+    let b=0;
+    const iv=setInterval(()=>{
+      if(b%2===0)tone(110,'sawtooth',0.08,0.12);
+      if(b%4===0)tone(82.4,'square',0.09,0.18);
+      tone(riff[b%riff.length],'sawtooth',0.05,0.22,0.04);
+      tone(riff[(b+3)%riff.length]*1.5,'triangle',0.035,0.18,0.08);
+      if(b%8===0)tone(440,'square',0.03,0.1,0.02);
+      b++;
+    },240);
+    loops.push(iv);
+  }
+  function boss(){
+    stopAll();
+    const dr=[146.8,130.8,155.6,146.8,123.5,130.8,138.6,146.8];
+    let b=0;
+    const iv=setInterval(()=>{
+      tone(dr[b%dr.length],'sawtooth',0.1,0.28);
+      tone(dr[b%dr.length]*2,'square',0.055,0.18,0.04);
+      if(b%3===0)tone(65.4,'sawtooth',0.12,0.38);
+      if(b%6===0){for(let k=0;k<3;k++)tone(880+k*120,'square',0.038,0.1,k*0.05);}
+      b++;
+    },200);
+    loops.push(iv);
+  }
+  function village(){
+    stopAll();
+    const folk=[392,440,493.9,523.2,493.9,440,392,349.2,392,440];
+    let i=0;
+    const iv=setInterval(()=>{
+      tone(folk[i%folk.length],'triangle',0.065,0.55,0,0.2);
+      tone(folk[(i+2)%folk.length]*0.5,'sine',0.04,0.7,0.15,-0.2);
+      if(i%4===0)tone(196,'sine',0.035,0.75);
+      i++;
+    },520);
+    loops.push(iv);
+  }
+  function victory(){
+    stopAll();
+    [[523.2,0],[659.3,.12],[783.9,.24],[1046.5,.36],[1318.5,.52]].forEach(([f,d])=>tone(f,'triangle',0.1,0.5,d));
+    setTimeout(()=>{[[523.2,0],[659.3,.08],[1046.5,.18],[1318.5,.3],[2093,.45]].forEach(([f,d])=>tone(f,'sine',0.08,0.65,d));},650);
+  }
+  function defeat(){
+    stopAll();
+    [[440,0],[415.3,.18],[392,.36],[349.2,.54],[329.6,.72],[293.7,.95]].forEach(([f,d])=>tone(f,'sawtooth',0.07,0.45,d));
+  }
+  function correct(){tone(880,'sine',0.12,0.12);setTimeout(()=>tone(1100,'sine',0.1,0.12),90);}
+  function wrong(){tone(200,'sawtooth',0.13,0.32);}
+  function click(){tone(600,'sine',0.055,0.07);}
+  function staff(){tone(320,'triangle',0.09,0.14);setTimeout(()=>tone(280,'sawtooth',0.07,0.1),55);}
+  function monster(){tone(150,'sawtooth',0.13,0.22);setTimeout(()=>tone(120,'square',0.09,0.16),75);}
+  function levelUp(){[523.2,659.3,783.9,1046.5,1318.5,1567.9].forEach((f,i)=>tone(f,'sine',0.1,0.3,i*.1));}
+  return{explore,battle,boss,village,victory,defeat,correct,wrong,click,staff,monster,levelUp,stopAll};
+})();
+
+// ═══════════════════════════════════
+// GAME DATA
+// ═══════════════════════════════════
+const EL={
+  fire:    {c:"#FF4500",g:"#FF6B35",bg:"#1a0500",icon:"🔥",name:"Fire"},
+  water:   {c:"#00BFFF",g:"#40E0FF",bg:"#001020",icon:"💧",name:"Water"},
+  electric:{c:"#FFD700",g:"#FFEC40",bg:"#0d0d00",icon:"⚡",name:"Electric"},
+  earth:   {c:"#228B22",g:"#32CD32",bg:"#001a00",icon:"🌿",name:"Earth"}
+};
+const AVATARS={
+  male:  {fire:{n:"Emberion",t:"Flame Warden"},water:{n:"Tidalus",t:"Tide Caller"},electric:{n:"Volthar",t:"Storm Sage"},earth:{n:"Thornwick",t:"Grove Guardian"}},
+  female:{fire:{n:"Embera",t:"Flame Weaver"},water:{n:"Seraphel",t:"River Mystic"},electric:{n:"Zaphira",t:"Lightning Lass"},earth:{n:"Mosswyn",t:"Root Speaker"}}
+};
+const PATHS={
+  warrior:{icon:"⚔️",label:"Warrior",desc:"Deal bonus damage on every hit",bonus:"Attack +5 per strike"},
+  mage:   {icon:"🧙",label:"Mage",   desc:"Hints cost no energy to reveal",bonus:"Free hint reveals"},
+  ranger: {icon:"🏹",label:"Ranger", desc:"Flee any battle without losing energy",bonus:"Free flee from battle"},
+  healer: {icon:"💚",label:"Healer", desc:"Restore energy after each correct answer",bonus:"Regenerate 2 energy per correct"},
+  rogue:  {icon:"🗡️",label:"Rogue",  desc:"Streak bonus damage is doubled",bonus:"Double streak multiplier"},
+  paladin:{icon:"🛡️",label:"Paladin",desc:"Begin with higher maximum energy",bonus:"Start with 30 max energy"}
+};
+
+// ── 450 UNIQUE QUESTIONS: 3 grades × 5 levels × 30 ──
+// Each level's questions are stored separately so they never repeat within a level
+const ALL_QUESTIONS={
+  6:{
+    1:[
+      {q:"6 × 7 = ?",a:"42",ch:["36","40","42","48"]},
+      {q:"24 ÷ 4 = ?",a:"6",ch:["4","5","6","8"]},
+      {q:"What is 1/2 of 20?",a:"10",ch:["8","10","12","15"]},
+      {q:"Round 47 to nearest ten:",a:"50",ch:["40","45","50","55"]},
+      {q:"5² = ?",a:"25",ch:["10","15","20","25"]},
+      {q:"3 + 4 × 2 = ?",a:"11",ch:["11","14","12","10"]},
+      {q:"What is 10% of 80?",a:"8",ch:["4","6","8","10"]},
+      {q:"Area: rectangle 5×4 = ?",a:"20",ch:["9","18","20","25"]},
+      {q:"Perimeter: square side 6 = ?",a:"24",ch:["12","18","24","36"]},
+      {q:"√25 = ?",a:"5",ch:["3","4","5","6"]},
+      {q:"9 × 8 = ?",a:"72",ch:["63","70","72","81"]},
+      {q:"100 ÷ 5 = ?",a:"20",ch:["15","20","25","30"]},
+      {q:"What is 3/4 of 16?",a:"12",ch:["8","10","12","14"]},
+      {q:"What is 25% of 40?",a:"10",ch:["8","10","12","15"]},
+      {q:"2³ = ?",a:"8",ch:["4","6","8","12"]},
+      {q:"60 ÷ 12 = ?",a:"5",ch:["4","5","6","7"]},
+      {q:"What is 50% of 34?",a:"17",ch:["12","15","17","20"]},
+      {q:"8 + 6 × 3 = ?",a:"26",ch:["26","42","24","30"]},
+      {q:"Area of square, side 7 = ?",a:"49",ch:["14","28","42","49"]},
+      {q:"√36 = ?",a:"6",ch:["4","5","6","7"]},
+      {q:"7 × 9 = ?",a:"63",ch:["54","56","63","72"]},
+      {q:"36 ÷ 6 = ?",a:"6",ch:["4","5","6","7"]},
+      {q:"What is 1/4 of 48?",a:"12",ch:["8","10","12","16"]},
+      {q:"What is 75% of 20?",a:"15",ch:["10","12","15","18"]},
+      {q:"4² = ?",a:"16",ch:["8","12","16","20"]},
+      {q:"15 + 3 × 4 = ?",a:"27",ch:["27","72","24","18"]},
+      {q:"Perimeter: rectangle 8×3 = ?",a:"22",ch:["11","22","24","48"]},
+      {q:"√49 = ?",a:"7",ch:["5","6","7","8"]},
+      {q:"What is 20% of 60?",a:"12",ch:["8","10","12","15"]},
+      {q:"12 × 6 = ?",a:"72",ch:["60","66","72","78"]}
+    ],
+    2:[
+      {q:"3x = 18 → x = ?",a:"6",ch:["4","5","6","8"]},
+      {q:"x + 7 = 15 → x = ?",a:"8",ch:["6","7","8","9"]},
+      {q:"2x + 1 = 11 → x = ?",a:"5",ch:["4","5","6","7"]},
+      {q:"Simplify 8/12",a:"2/3",ch:["1/2","2/3","3/4","4/5"]},
+      {q:"3/5 + 1/5 = ?",a:"4/5",ch:["2/5","3/5","4/5","1"]},
+      {q:"7/8 - 3/8 = ?",a:"1/2",ch:["1/4","1/2","3/4","4/8"]},
+      {q:"What is 30% of 50?",a:"15",ch:["10","12","15","20"]},
+      {q:"Solve: 4x = 32",a:"8",ch:["6","7","8","9"]},
+      {q:"What is 15% of 80?",a:"12",ch:["8","10","12","16"]},
+      {q:"Convert 0.5 to fraction:",a:"1/2",ch:["1/3","1/2","2/3","3/4"]},
+      {q:"5x - 3 = 17 → x = ?",a:"4",ch:["3","4","5","6"]},
+      {q:"Simplify 15/20",a:"3/4",ch:["1/2","2/3","3/4","4/5"]},
+      {q:"1/4 + 2/4 = ?",a:"3/4",ch:["1/2","3/4","1","5/4"]},
+      {q:"What is 40% of 70?",a:"28",ch:["20","24","28","35"]},
+      {q:"Convert 0.25 to %:",a:"25%",ch:["20%","25%","30%","35%"]},
+      {q:"x - 9 = 14 → x = ?",a:"23",ch:["5","14","19","23"]},
+      {q:"Simplify 12/18",a:"2/3",ch:["1/2","2/3","3/4","2/4"]},
+      {q:"5/6 - 1/6 = ?",a:"2/3",ch:["1/3","2/3","4/6","5/6"]},
+      {q:"What is 60% of 45?",a:"27",ch:["20","25","27","30"]},
+      {q:"Convert 3/4 to decimal:",a:"0.75",ch:["0.5","0.6","0.75","0.8"]},
+      {q:"2x + 5 = 19 → x = ?",a:"7",ch:["5","6","7","8"]},
+      {q:"Simplify 16/24",a:"2/3",ch:["1/2","2/3","3/4","1/3"]},
+      {q:"2/3 + 1/6 = ?",a:"5/6",ch:["3/9","1/2","5/6","3/6"]},
+      {q:"What is 35% of 40?",a:"14",ch:["10","12","14","16"]},
+      {q:"Convert 0.8 to fraction:",a:"4/5",ch:["3/4","4/5","5/6","1/8"]},
+      {q:"3x - 6 = 12 → x = ?",a:"6",ch:["4","5","6","7"]},
+      {q:"Simplify 9/15",a:"3/5",ch:["2/5","3/5","4/5","1/3"]},
+      {q:"3/8 + 1/4 = ?",a:"5/8",ch:["4/8","5/8","6/8","7/8"]},
+      {q:"What is 45% of 20?",a:"9",ch:["6","8","9","10"]},
+      {q:"Convert 1/5 to decimal:",a:"0.2",ch:["0.1","0.2","0.5","0.15"]}
+    ],
+    3:[
+      {q:"What is √64?",a:"8",ch:["6","7","8","9"]},
+      {q:"12² = ?",a:"144",ch:["124","132","144","156"]},
+      {q:"What is 3/4 + 1/4?",a:"1",ch:["3/4","1","5/4","2"]},
+      {q:"If a=5: 3a + 2 = ?",a:"17",ch:["13","15","17","20"]},
+      {q:"Area of triangle: b=8, h=6 = ?",a:"24",ch:["14","24","48","96"]},
+      {q:"Perimeter of triangle: 5,6,7 = ?",a:"18",ch:["14","16","18","20"]},
+      {q:"What is 15% of 60?",a:"9",ch:["6","8","9","12"]},
+      {q:"10² = ?",a:"100",ch:["20","50","100","200"]},
+      {q:"√81 = ?",a:"9",ch:["7","8","9","10"]},
+      {q:"If b=3: 4b² = ?",a:"36",ch:["24","30","36","48"]},
+      {q:"Convert 2/5 to %:",a:"40%",ch:["25%","35%","40%","45%"]},
+      {q:"Area of triangle: b=10, h=4 = ?",a:"20",ch:["14","20","40","80"]},
+      {q:"7² = ?",a:"49",ch:["21","42","49","56"]},
+      {q:"√121 = ?",a:"11",ch:["9","10","11","12"]},
+      {q:"If c=4: 2c³ = ?",a:"128",ch:["32","64","96","128"]},
+      {q:"What is 35% of 80?",a:"28",ch:["20","24","28","35"]},
+      {q:"Volume of cube: side=3 = ?",a:"27",ch:["9","18","27","36"]},
+      {q:"9² = ?",a:"81",ch:["27","72","81","90"]},
+      {q:"√144 = ?",a:"12",ch:["10","11","12","13"]},
+      {q:"If d=6: d² - 10 = ?",a:"26",ch:["22","24","26","28"]},
+      {q:"Area of parallelogram: b=9,h=5=?",a:"45",ch:["14","28","40","45"]},
+      {q:"6² = ?",a:"36",ch:["12","24","36","48"]},
+      {q:"√169 = ?",a:"13",ch:["11","12","13","14"]},
+      {q:"If e=2: 5e⁴ = ?",a:"80",ch:["40","60","80","100"]},
+      {q:"Circumference: d=10, π≈3.14=?",a:"31.4",ch:["15.7","31.4","62.8","100"]},
+      {q:"8² = ?",a:"64",ch:["48","56","64","72"]},
+      {q:"√196 = ?",a:"14",ch:["12","13","14","15"]},
+      {q:"If f=7: f² + f = ?",a:"56",ch:["49","54","56","63"]},
+      {q:"Volume of cube: side=4 = ?",a:"64",ch:["16","32","48","64"]},
+      {q:"Area of circle: r=5, π≈3.14=?",a:"78.5",ch:["31.4","62.8","78.5","157"]}
+    ],
+    4:[
+      {q:"Mean of 2,4,6,8,10 = ?",a:"6",ch:["4","5","6","7"]},
+      {q:"Median of 3,7,2,9,5 = ?",a:"5",ch:["3","4","5","7"]},
+      {q:"Mode of 2,4,4,6,4,8 = ?",a:"4",ch:["2","4","6","8"]},
+      {q:"Range of 5,12,3,18,9 = ?",a:"15",ch:["9","13","15","18"]},
+      {q:"Mean of 10,20,30,40 = ?",a:"25",ch:["20","25","30","35"]},
+      {q:"Median of 1,3,5,7,9,11 = ?",a:"6",ch:["4","5","6","7"]},
+      {q:"Mode of 5,3,5,7,3,5 = ?",a:"5",ch:["3","5","7","6"]},
+      {q:"Range of 22,14,35,8,27 = ?",a:"27",ch:["14","22","27","35"]},
+      {q:"Mean of 15,25,35 = ?",a:"25",ch:["20","25","28","30"]},
+      {q:"Probability: 1 of 4 outcomes = ?",a:"1/4",ch:["1/2","1/3","1/4","1/5"]},
+      {q:"Probability: 3 of 5 outcomes = ?",a:"3/5",ch:["2/5","3/5","4/5","1/5"]},
+      {q:"A bag: 3R,2B. P(red)=?",a:"3/5",ch:["2/5","3/5","1/2","2/3"]},
+      {q:"Median of 4,8,2,10,6 = ?",a:"6",ch:["4","5","6","8"]},
+      {q:"Mean of 6,8,10,12,14 = ?",a:"10",ch:["8","9","10","11"]},
+      {q:"Range of 100,45,72,18,63 = ?",a:"82",ch:["55","63","82","100"]},
+      {q:"Mode of 7,3,7,9,3,7,1 = ?",a:"7",ch:["1","3","7","9"]},
+      {q:"P(even) rolling a die = ?",a:"1/2",ch:["1/6","1/3","1/2","2/3"]},
+      {q:"P(rolling 6) on a die = ?",a:"1/6",ch:["1/2","1/4","1/6","1/3"]},
+      {q:"Mean of 9,3,6,12,15 = ?",a:"9",ch:["6","8","9","12"]},
+      {q:"Median of 2,2,5,8,8 = ?",a:"5",ch:["2","4","5","8"]},
+      {q:"A bag: 2R,3G,5B. P(blue)=?",a:"1/2",ch:["1/5","1/3","1/2","3/5"]},
+      {q:"Mean of 0,2,4,6,8,10 = ?",a:"5",ch:["3","4","5","6"]},
+      {q:"Range of 33,17,29,42,8 = ?",a:"34",ch:["25","29","34","42"]},
+      {q:"Mode of 4,6,4,9,6,4,9 = ?",a:"4",ch:["4","6","9","none"]},
+      {q:"P(head) on coin flip = ?",a:"1/2",ch:["1/4","1/3","1/2","2/3"]},
+      {q:"Median of 11,3,7,15,9 = ?",a:"9",ch:["7","8","9","11"]},
+      {q:"Mean of 5,10,15,20,25,30 = ?",a:"17.5",ch:["15","16","17.5","18"]},
+      {q:"P(vowel) in A,B,C,D,E = ?",a:"2/5",ch:["1/5","2/5","1/2","3/5"]},
+      {q:"Range of 56,72,34,91,47 = ?",a:"57",ch:["34","47","57","91"]},
+      {q:"Mode of 1,1,2,2,3,3,3 = ?",a:"3",ch:["1","2","3","none"]}
+    ],
+    5:[
+      {q:"Ratio 3:12 simplified = ?",a:"1:4",ch:["1:2","1:3","1:4","1:6"]},
+      {q:"If 2:3 = 8:?, ? = ?",a:"12",ch:["9","10","12","16"]},
+      {q:"Scale 1:100. 5cm = ? real m",a:"5m",ch:["1m","2m","5m","10m"]},
+      {q:"Rate: 60 miles in 2 hrs = ? mph",a:"30",ch:["20","25","30","35"]},
+      {q:"Proportion: 3/4 = x/12, x = ?",a:"9",ch:["6","8","9","10"]},
+      {q:"Ratio 15:25 simplified = ?",a:"3:5",ch:["1:2","2:3","3:5","5:3"]},
+      {q:"If 5:8 = 10:?, ? = ?",a:"16",ch:["12","14","16","20"]},
+      {q:"Rate: $24 for 8 items = $/item",a:"$3",ch:["$2","$3","$4","$6"]},
+      {q:"Proportion: 2/5 = 6/?, ? = ?",a:"15",ch:["10","12","15","20"]},
+      {q:"Scale 1:50. 4cm = ? real m",a:"2m",ch:["1m","2m","4m","8m"]},
+      {q:"Ratio 4:20 simplified = ?",a:"1:5",ch:["1:4","1:5","2:5","4:5"]},
+      {q:"Rate: 180 words in 3 min = ? wpm",a:"60",ch:["40","50","60","90"]},
+      {q:"Proportion: 4/x = 8/6, x = ?",a:"3",ch:["2","3","4","6"]},
+      {q:"If 3:7 = 9:?, ? = ?",a:"21",ch:["18","19","21","27"]},
+      {q:"Scale 2:1. Model 6cm = ? real cm",a:"3cm",ch:["1cm","2cm","3cm","6cm"]},
+      {q:"Rate: 45 km in 3 hrs = ? kph",a:"15",ch:["10","12","15","20"]},
+      {q:"Proportion: 3/4 = 9/?, ? = ?",a:"12",ch:["8","10","12","16"]},
+      {q:"Ratio 18:24 simplified = ?",a:"3:4",ch:["2:3","3:4","1:2","3:5"]},
+      {q:"Rate: $56 for 7 hrs = ?/hr",a:"$8",ch:["$6","$7","$8","$9"]},
+      {q:"If 4:5 = 20:?, ? = ?",a:"25",ch:["16","20","25","30"]},
+      {q:"Scale 1:200. 3cm = ? real m",a:"6m",ch:["3m","5m","6m","10m"]},
+      {q:"Proportion: x/6 = 4/8, x = ?",a:"3",ch:["2","3","4","6"]},
+      {q:"Ratio 6:9:12 simplified = ?",a:"2:3:4",ch:["1:2:3","2:3:4","3:4:5","6:9:12"]},
+      {q:"Rate: 200 pages in 4 days = ?/day",a:"50",ch:["40","45","50","60"]},
+      {q:"Proportion: 5/8 = 15/?, ? = ?",a:"24",ch:["16","20","24","30"]},
+      {q:"If 2:9 = 6:?, ? = ?",a:"27",ch:["18","24","27","30"]},
+      {q:"Scale 1:500. 2cm = ? real m",a:"10m",ch:["5m","8m","10m","15m"]},
+      {q:"Rate: 90 beats in 1.5 min = ? bpm",a:"60",ch:["45","55","60","90"]},
+      {q:"Proportion: 7/x = 14/8, x = ?",a:"4",ch:["2","4","6","7"]},
+      {q:"Ratio 24:36 simplified = ?",a:"2:3",ch:["1:2","2:3","3:4","4:6"]}
+    ]
+  },
+  7:{
+    1:[
+      {q:"2x + 3 = 11 → x = ?",a:"4",ch:["3","4","5","7"]},
+      {q:"15% of 200 = ?",a:"30",ch:["20","25","30","40"]},
+      {q:"Expand 4(x + 3)",a:"4x+12",ch:["4x+3","4x+7","4x+12","x+12"]},
+      {q:"-3 × -7 = ?",a:"21",ch:["-21","-10","10","21"]},
+      {q:"2³ = ?",a:"8",ch:["4","6","8","16"]},
+      {q:"Area: l=8, w=5 = ?",a:"40",ch:["26","30","40","45"]},
+      {q:"x/4 = 7 → x = ?",a:"28",ch:["11","21","28","35"]},
+      {q:"Mean of 4,8,6,10,2 = ?",a:"6",ch:["5","6","7","8"]},
+      {q:"5x - 10 = 15 → x = ?",a:"5",ch:["3","4","5","6"]},
+      {q:"(-2)⁴ = ?",a:"16",ch:["-16","-8","8","16"]},
+      {q:"3x - 7 = 14 → x = ?",a:"7",ch:["5","6","7","9"]},
+      {q:"40% of 150 = ?",a:"60",ch:["45","55","60","70"]},
+      {q:"Expand 3(2x - 5)",a:"6x-15",ch:["6x-5","6x-15","3x-15","5x-15"]},
+      {q:"-8 × 6 = ?",a:"-48",ch:["-56","-48","-42","48"]},
+      {q:"3⁴ = ?",a:"81",ch:["12","27","64","81"]},
+      {q:"Perimeter: l=9, w=4 = ?",a:"26",ch:["13","18","26","36"]},
+      {q:"x/3 = 9 → x = ?",a:"27",ch:["3","12","27","30"]},
+      {q:"Median of 3,7,2,9,5 = ?",a:"5",ch:["4","5","6","7"]},
+      {q:"4x + 8 = 28 → x = ?",a:"5",ch:["3","4","5","6"]},
+      {q:"(-5)² = ?",a:"25",ch:["-25","-10","10","25"]},
+      {q:"6x = 54 → x = ?",a:"9",ch:["6","8","9","10"]},
+      {q:"30% of 250 = ?",a:"75",ch:["55","65","75","85"]},
+      {q:"Expand 5(x - 4)",a:"5x-20",ch:["5x-4","5x-9","5x-20","x-20"]},
+      {q:"-9 × -4 = ?",a:"36",ch:["-36","-13","13","36"]},
+      {q:"2⁵ = ?",a:"32",ch:["10","16","32","64"]},
+      {q:"Area: triangle b=8, h=6 = ?",a:"24",ch:["14","24","48","96"]},
+      {q:"x/5 + 3 = 7 → x = ?",a:"20",ch:["4","10","20","25"]},
+      {q:"Mode of 2,4,4,6,8,4 = ?",a:"4",ch:["2","4","6","8"]},
+      {q:"7x - 3 = 39 → x = ?",a:"6",ch:["4","5","6","7"]},
+      {q:"(-3)³ = ?",a:"-27",ch:["-27","-9","9","27"]}
+    ],
+    2:[
+      {q:"Solve: 2(x+3)=14, x=?",a:"4",ch:["3","4","5","6"]},
+      {q:"y = 3x + 2, when x=4, y=?",a:"14",ch:["10","12","14","16"]},
+      {q:"Slope of y = 2x - 5 is?",a:"2",ch:["1","2","5","7"]},
+      {q:"Is (2,8) on y=4x? Yes/No",a:"Yes",ch:["Yes","No","Maybe","Cannot tell"]},
+      {q:"y-intercept of y=3x+7 is?",a:"7",ch:["3","5","7","10"]},
+      {q:"Solve: 3(x-2)=15, x=?",a:"7",ch:["5","6","7","8"]},
+      {q:"y = -2x + 6, when x=3, y=?",a:"0",ch:["-6","0","2","6"]},
+      {q:"Slope of y = -4x + 1 is?",a:"-4",ch:["-4","-1","1","4"]},
+      {q:"Is (3,9) on y=x²? Yes/No",a:"Yes",ch:["Yes","No","Maybe","Only if x>0"]},
+      {q:"y-intercept of y=5x-3 is?",a:"-3",ch:["-5","-3","3","5"]},
+      {q:"Solve: 4(2x+1)=20, x=?",a:"2",ch:["1","2","3","4"]},
+      {q:"y=2x-4. Find x when y=0",a:"2",ch:["0","2","4","6"]},
+      {q:"Slope between (0,0) and (3,6)?",a:"2",ch:["1","2","3","6"]},
+      {q:"Is (4,2) on y=x/2? Yes/No",a:"Yes",ch:["Yes","No","Partly","Never"]},
+      {q:"y-intercept of y=x-8 is?",a:"-8",ch:["-8","-1","0","8"]},
+      {q:"Solve: 2(3x-4)=16, x=?",a:"4",ch:["2","3","4","5"]},
+      {q:"y=x+5. When x=-3, y=?",a:"2",ch:["-2","0","2","8"]},
+      {q:"Slope between (1,2) and (3,6)?",a:"2",ch:["1","2","3","4"]},
+      {q:"y-intercept of y=7x is?",a:"0",ch:["-7","0","1","7"]},
+      {q:"Solve: 5(x+2)=25, x=?",a:"3",ch:["2","3","4","5"]},
+      {q:"y = -x + 4. When x=4, y=?",a:"0",ch:["-4","0","4","8"]},
+      {q:"Slope of y=x is?",a:"1",ch:["0","1","x","undefined"]},
+      {q:"Is (-1,3) on y=-x+2? Yes/No",a:"Yes",ch:["Yes","No","Only positive x","Cannot tell"]},
+      {q:"Solve: 3(x-5)=0, x=?",a:"5",ch:["0","3","5","15"]},
+      {q:"y=4x-8. Find x when y=0",a:"2",ch:["1","2","4","8"]},
+      {q:"Slope between (2,5) and (4,9)?",a:"2",ch:["1","2","4","7"]},
+      {q:"y-intercept of y=-2x+6 is?",a:"6",ch:["-6","-2","2","6"]},
+      {q:"Solve: 6(x-1)=30, x=?",a:"6",ch:["4","5","6","7"]},
+      {q:"y=3x. When x=-2, y=?",a:"-6",ch:["-6","-2","2","6"]},
+      {q:"Slope between (-1,0) and (1,4)?",a:"2",ch:["1","2","4","8"]}
+    ],
+    3:[
+      {q:"Solve: 2x+3y=12, x=3. y=?",a:"2",ch:["1","2","3","4"]},
+      {q:"Solve system: x+y=10, x-y=4. x=?",a:"7",ch:["3","5","7","9"]},
+      {q:"What is -5 + 3?",a:"-2",ch:["-8","-2","2","8"]},
+      {q:"-4 - (-7) = ?",a:"3",ch:["-11","-3","3","11"]},
+      {q:"Simplify: -3(x-4)",a:"-3x+12",ch:["-3x-4","-3x+4","-3x+12","3x-12"]},
+      {q:"Solve: x + 2y=8, x=2. y=?",a:"3",ch:["1","2","3","4"]},
+      {q:"Solve system: 2x+y=7, x+y=5. x=?",a:"2",ch:["1","2","3","4"]},
+      {q:"-8 + (-3) = ?",a:"-11",ch:["-11","-5","5","11"]},
+      {q:"-6 - 4 = ?",a:"-10",ch:["-10","-2","2","10"]},
+      {q:"Simplify: -(2x+5)",a:"-2x-5",ch:["-2x-5","-2x+5","2x+5","2x-5"]},
+      {q:"Solve: 3x-y=9, y=3. x=?",a:"4",ch:["2","3","4","6"]},
+      {q:"Solve system: x+y=6, x-y=2. y=?",a:"2",ch:["1","2","3","4"]},
+      {q:"(-7)+(-4) = ?",a:"-11",ch:["-11","-3","3","11"]},
+      {q:"-2-(-9) = ?",a:"7",ch:["-11","-7","7","11"]},
+      {q:"Simplify: 4-(2x-3)",a:"-2x+7",ch:["-2x-7","-2x+1","-2x+7","2x-7"]},
+      {q:"Solve: 2x+3y=13, y=3. x=?",a:"2",ch:["1","2","4","7"]},
+      {q:"Solve system: x+2y=9, x-y=3. x=?",a:"5",ch:["3","4","5","6"]},
+      {q:"|−8| = ?",a:"8",ch:["-8","0","8","64"]},
+      {q:"|3-10| = ?",a:"7",ch:["-7","0","7","13"]},
+      {q:"Simplify: 2x-(x-5)",a:"x+5",ch:["x-5","x+5","3x-5","x"]},
+      {q:"Solve: 4x-2y=10, x=3. y=?",a:"1",ch:["0","1","2","3"]},
+      {q:"Solve system: 3x+y=10, x+y=4. x=?",a:"3",ch:["1","2","3","4"]},
+      {q:"|x|=5. x=?",a:"±5",ch:["-5","5","±5","0"]},
+      {q:"-15 ÷ (-3) = ?",a:"5",ch:["-5","0","5","15"]},
+      {q:"Simplify: -(x-y)+x",a:"y",ch:["-y","0","y","2x-y"]},
+      {q:"Solve: x-3y=1, y=-1. x=?",a:"-2",ch:["-4","-2","1","4"]},
+      {q:"Solve system: 2x-y=5, x+y=7. y=?",a:"3",ch:["1","2","3","5"]},
+      {q:"-20 ÷ 4 = ?",a:"-5",ch:["-10","-5","5","10"]},
+      {q:"|2x|=12 → x=?",a:"±6",ch:["-6","6","±6","24"]},
+      {q:"Simplify: 3(a-2b)-a",a:"2a-6b",ch:["2a+6b","2a-6b","4a-2b","2a-2b"]}
+    ],
+    4:[
+      {q:"x² + 5x + 6 = 0, factors?",a:"(x+2)(x+3)",ch:["(x+1)(x+6)","(x+2)(x+3)","(x+3)(x+4)","(x+2)(x+4)"]},
+      {q:"Expand (x+3)²",a:"x²+6x+9",ch:["x²+9","x²+3x+9","x²+6x+9","x²+6x+3"]},
+      {q:"x² - 9 = 0, x = ?",a:"±3",ch:["-3","3","±3","9"]},
+      {q:"Expand (x+4)(x-2)",a:"x²+2x-8",ch:["x²-2x-8","x²+2x-8","x²+2x+8","x²-6x-8"]},
+      {q:"Factor x²-4",a:"(x+2)(x-2)",ch:["(x-2)²","(x+2)(x-2)","(x+4)(x-1)","(x+2)²"]},
+      {q:"x² + 7x + 12 = 0, factors?",a:"(x+3)(x+4)",ch:["(x+2)(x+6)","(x+3)(x+4)","(x+4)(x+3)","(x+1)(x+12)"]},
+      {q:"Expand (2x+3)(x-1)",a:"2x²+x-3",ch:["2x²-x-3","2x²+x-3","2x²+x+3","2x²-x+3"]},
+      {q:"x² - 16 = 0, x = ?",a:"±4",ch:["-4","4","±4","8"]},
+      {q:"Factor 2x²+4x",a:"2x(x+2)",ch:["2(x²+2x)","2x(x+2)","x(2x+4)","2x(x-2)"]},
+      {q:"Expand (x-5)²",a:"x²-10x+25",ch:["x²-25","x²+25","x²-10x+25","x²+10x+25"]},
+      {q:"x² + x - 6 = 0, factors?",a:"(x+3)(x-2)",ch:["(x+2)(x-3)","(x+3)(x-2)","(x-3)(x+2)","(x-1)(x+6)"]},
+      {q:"Factor 3x²-12x",a:"3x(x-4)",ch:["3(x²-4x)","3x(x-4)","x(3x-12)","3x(x+4)"]},
+      {q:"Expand (x+1)(x+8)",a:"x²+9x+8",ch:["x²+8x+1","x²+9x+8","x²+8x+9","x²+x+8"]},
+      {q:"x² - 25 = 0, x = ?",a:"±5",ch:["-5","5","±5","25"]},
+      {q:"Factor x²-x-12",a:"(x-4)(x+3)",ch:["(x-3)(x+4)","(x-4)(x+3)","(x+4)(x-3)","(x-6)(x+2)"]},
+      {q:"Expand (3x-2)²",a:"9x²-12x+4",ch:["9x²+4","9x²-4","9x²-12x+4","9x²+12x+4"]},
+      {q:"x² + 3x - 10 = 0, factors?",a:"(x+5)(x-2)",ch:["(x+5)(x-2)","(x-5)(x+2)","(x+2)(x+5)","(x-2)(x-5)"]},
+      {q:"Factor 4x²-16",a:"4(x+2)(x-2)",ch:["4(x-2)²","4(x+2)(x-2)","2(x+4)(x-4)","4(x²-4)"]},
+      {q:"Expand (x-3)(x+7)",a:"x²+4x-21",ch:["x²-4x-21","x²+4x-21","x²-4x+21","x²+4x+21"]},
+      {q:"x²-2x-8=0, x=? (larger)",a:"4",ch:["-2","2","4","8"]},
+      {q:"Factor x²+8x+16",a:"(x+4)²",ch:["(x+4)(x-4)","(x+4)²","(x+2)(x+8)","(x-4)²"]},
+      {q:"Expand (2x+1)(2x-1)",a:"4x²-1",ch:["4x²+1","4x²-1","4x²-2x","2x²-1"]},
+      {q:"x²-7x+12=0, smaller root?",a:"3",ch:["3","4","12","7"]},
+      {q:"Factor 5x²+10x",a:"5x(x+2)",ch:["5(x²+2x)","5x(x+2)","x(5x+10)","5x(x-2)"]},
+      {q:"Expand (x+6)(x-6)",a:"x²-36",ch:["x²-12x-36","x²+36","x²-36","x²+12x-36"]},
+      {q:"x²+2x-15=0, factors?",a:"(x+5)(x-3)",ch:["(x-5)(x+3)","(x+5)(x-3)","(x+3)(x-5)","(x-3)(x+5)"]},
+      {q:"Factor 2x²-8",a:"2(x+2)(x-2)",ch:["2(x²-4)","2(x+2)(x-2)","2(x-2)²","(2x+4)(x-2)"]},
+      {q:"Expand (x-1)³ first two terms?",a:"x³-3x²",ch:["x³+3x²","x³-3x²","x³-x²","x³-1"]},
+      {q:"x²-10x+25=0, x=?",a:"5",ch:["±5","5","10","25"]},
+      {q:"Factor x²-11x+30",a:"(x-5)(x-6)",ch:["(x-5)(x-6)","(x-6)(x-5)","(x+5)(x+6)","(x-3)(x-10)"]}
+    ],
+    5:[
+      {q:"SA of cube, side=5?",a:"150",ch:["25","100","125","150"]},
+      {q:"Volume cylinder r=3,h=4,π≈3.14",a:"113.04",ch:["37.68","75.36","113.04","226.08"]},
+      {q:"SA of rectangular prism 3×4×5?",a:"94",ch:["60","70","94","120"]},
+      {q:"Volume pyramid base=9,h=6?",a:"18",ch:["9","18","27","54"]},
+      {q:"Interior ∠ sum of pentagon?",a:"540°",ch:["360°","450°","540°","720°"]},
+      {q:"SA of sphere r=3, π≈3.14?",a:"113.04",ch:["28.26","56.52","113.04","339.12"]},
+      {q:"Volume cone r=3,h=4,π≈3.14?",a:"37.68",ch:["12.56","25.12","37.68","50.24"]},
+      {q:"SA of triangular prism (b=6,h=4,l=10,sides=5)?",a:"168",ch:["120","144","168","200"]},
+      {q:"Interior ∠ sum of hexagon?",a:"720°",ch:["360°","540°","720°","900°"]},
+      {q:"Each interior ∠ of regular hexagon?",a:"120°",ch:["60°","90°","120°","180°"]},
+      {q:"Volume sphere r=3, π≈3.14?",a:"113.04",ch:["28.26","56.52","113.04","339.12"]},
+      {q:"SA cylinder r=2,h=6,π≈3.14?",a:"100.48",ch:["50.24","75.36","100.48","125.6"]},
+      {q:"Interior ∠ sum of octagon?",a:"1080°",ch:["720°","900°","1080°","1440°"]},
+      {q:"Volume pyramid b=6,h=9?",a:"108",ch:["27","54","108","162"]},
+      {q:"Each interior ∠ regular triangle?",a:"60°",ch:["45°","60°","90°","120°"]},
+      {q:"SA of cube side=3?",a:"54",ch:["9","27","54","81"]},
+      {q:"Volume cone r=4,h=6,π≈3.14?",a:"100.48",ch:["50.24","75.36","100.48","150.72"]},
+      {q:"Interior ∠ sum of quadrilateral?",a:"360°",ch:["180°","270°","360°","540°"]},
+      {q:"SA rectangular prism 2×3×4?",a:"52",ch:["24","36","48","52"]},
+      {q:"Each interior ∠ regular octagon?",a:"135°",ch:["90°","120°","135°","144°"]},
+      {q:"Volume sphere r=2, π≈3.14?",a:"33.49",ch:["16.75","25.12","33.49","50.24"]},
+      {q:"SA sphere r=4, π≈3.14?",a:"200.96",ch:["50.24","100.48","150.72","200.96"]},
+      {q:"Interior ∠ sum of heptagon?",a:"900°",ch:["540°","720°","900°","1080°"]},
+      {q:"Volume cylinder r=2,h=5,π≈3.14?",a:"62.8",ch:["31.4","50.24","62.8","125.6"]},
+      {q:"Each interior ∠ regular pentagon?",a:"108°",ch:["90°","100°","108°","120°"]},
+      {q:"SA of cube side=6?",a:"216",ch:["36","144","216","252"]},
+      {q:"Volume pyramid square base=4,h=9?",a:"48",ch:["12","36","48","144"]},
+      {q:"Interior ∠ sum of decagon?",a:"1440°",ch:["900°","1080°","1260°","1440°"]},
+      {q:"SA triangular prism l=8,base 3-4-5,h=3?",a:"96",ch:["48","72","96","120"]},
+      {q:"Each interior ∠ regular decagon?",a:"144°",ch:["120°","135°","144°","150°"]}
+    ]
+  },
+  8:{
+    1:[
+      {q:"3x-5=2x+9 → x=?",a:"14",ch:["4","7","14","21"]},
+      {q:"a=3,b=4 → c=?",a:"5",ch:["4","5","6","7"]},
+      {q:"Slope: y=3x+2",a:"3",ch:["1","2","3","5"]},
+      {q:"Factor x²+5x+6",a:"(x+2)(x+3)",ch:["(x+1)(x+6)","(x+2)(x+3)","(x+3)(x+4)","(x+2)(x+4)"]},
+      {q:"Volume cube side=4",a:"64",ch:["16","48","64","96"]},
+      {q:"|x|=7 → x=?",a:"±7",ch:["7","-7","±7","49"]},
+      {q:"30 is ?% of 150",a:"20",ch:["15","20","25","30"]},
+      {q:"f(x)=2x², f(3)=?",a:"18",ch:["12","15","18","36"]},
+      {q:"2(x-3)=10 → x=?",a:"8",ch:["4","6","7","8"]},
+      {q:"C=2πr, r=7, π=3.14",a:"43.96",ch:["21.98","43.96","153.86","21.99"]},
+      {q:"4x+2y=20, x=3 → y=?",a:"4",ch:["2","3","4","5"]},
+      {q:"a=5,b=12 → c=?",a:"13",ch:["11","12","13","14"]},
+      {q:"y-int of y=4x-6",a:"-6",ch:["-8","-6","-4","-2"]},
+      {q:"Factor x²-9",a:"(x+3)(x-3)",ch:["(x-3)²","(x+3)(x-3)","(x+9)(x-1)","(x+1)(x+9)"]},
+      {q:"SA cube side=3",a:"54",ch:["18","36","54","72"]},
+      {q:"60% of 80 = ?",a:"48",ch:["40","44","48","52"]},
+      {q:"g(x)=x²-4, g(2)=?",a:"0",ch:["-4","0","4","8"]},
+      {q:"5(x+2)=3x+14 → x=?",a:"2",ch:["1","2","3","4"]},
+      {q:"a=8,c=10 → b=?",a:"6",ch:["4","5","6","7"]},
+      {q:"Slope (1,2)(3,8)",a:"3",ch:["1","2","3","4"]},
+      {q:"2x+3y=12, y=2 → x=?",a:"3",ch:["1","2","3","4"]},
+      {q:"Factor 2x²+7x+3",a:"(2x+1)(x+3)",ch:["(2x+3)(x+1)","(2x+1)(x+3)","(x+1)(2x+3)","(2x-1)(x+3)"]},
+      {q:"V sphere r=3, π=3.14",a:"113.04",ch:["37.68","75.36","113.04","226.08"]},
+      {q:"3x²=75 → x=?",a:"5",ch:["3","4","5","6"]},
+      {q:"System: x+y=10,x-y=4 → x=?",a:"7",ch:["3","5","7","9"]},
+      {q:"Simplify (x³)²",a:"x⁶",ch:["x⁵","x⁶","2x³","x⁹"]},
+      {q:"∠ in semicircle=?",a:"90°",ch:["45°","60°","90°","180°"]},
+      {q:"y=2x²-1, y when x=3?",a:"17",ch:["11","13","17","19"]},
+      {q:"Factor 3x²-12",a:"3(x+2)(x-2)",ch:["3(x-2)²","3(x+2)(x-2)","(3x+6)(x-2)","3(x²-4)"]},
+      {q:"SA cylinder r=3,h=5,π=3.14",a:"150.72",ch:["75.36","113.04","150.72","188.4"]}
+    ],
+    2:[
+      {q:"f⁻¹(x) of f(x)=3x+1",a:"(x-1)/3",ch:["3x-1","(x+1)/3","(x-1)/3","x/3+1"]},
+      {q:"Domain of f(x)=√x is?",a:"x≥0",ch:["all reals","x>0","x≥0","x≤0"]},
+      {q:"f(g(x)), f=2x, g=x+3. At x=1?",a:"8",ch:["5","7","8","10"]},
+      {q:"Range of f(x)=x² is?",a:"y≥0",ch:["all reals","y>0","y≥0","y≤0"]},
+      {q:"f(x)=x²+1. f(-2)=?",a:"5",ch:["3","4","5","6"]},
+      {q:"Inverse of f(x)=2x-4",a:"(x+4)/2",ch:["(x-4)/2","(x+4)/2","2x+4","x/2+4"]},
+      {q:"f(x)=3x. f(f(2))=?",a:"18",ch:["6","9","12","18"]},
+      {q:"Is f(x)=x² a function? Yes/No",a:"Yes",ch:["Yes","No","Partially","Undefined"]},
+      {q:"f(x)=5x-3. Find x when f(x)=12",a:"3",ch:["1","2","3","4"]},
+      {q:"Inverse of f(x)=x/4+2",a:"4(x-2)",ch:["4x-2","4(x-2)","x/4-2","(x-2)/4"]},
+      {q:"f(x)=x²-3x. f(4)=?",a:"4",ch:["2","3","4","5"]},
+      {q:"Domain of f(x)=1/x?",a:"x≠0",ch:["all reals","x>0","x≥0","x≠0"]},
+      {q:"f(g(1)), f=x+2, g=3x. g(1)=?",a:"3",ch:["1","2","3","4"]},
+      {q:"f(x)=4x+1. f⁻¹(9)=?",a:"2",ch:["1","2","3","4"]},
+      {q:"Range of f(x)=|x|?",a:"y≥0",ch:["all reals","y>0","y≥0","y≤0"]},
+      {q:"f(x)=2x²+x. f(-1)=?",a:"1",ch:["-1","0","1","3"]},
+      {q:"Inverse of f(x)=x³",a:"∛x",ch:["x³","x²","∛x","x/3"]},
+      {q:"f(x)=6-2x. Find x when f(x)=0",a:"3",ch:["0","2","3","6"]},
+      {q:"f(g(x)), f=x², g=x+1. At x=2?",a:"9",ch:["5","7","9","16"]},
+      {q:"Is x=3 always a function? Yes/No",a:"No",ch:["Yes","No","Sometimes","Yes if bounded"]},
+      {q:"f(x)=½x-3. f(10)=?",a:"2",ch:["-1","0","2","5"]},
+      {q:"Inverse of f(x)=5-x",a:"5-x",ch:["x-5","5+x","5-x","1/(5-x)"]},
+      {q:"f(f(2)), f(x)=x+5",a:"12",ch:["7","10","12","14"]},
+      {q:"Domain of f(x)=√(x-2)?",a:"x≥2",ch:["x>0","x≥0","x≥2","x>2"]},
+      {q:"f(x)=x²-4x+4. f(2)=?",a:"0",ch:["-2","0","4","8"]},
+      {q:"Inverse of f(x)=3x-9",a:"(x+9)/3",ch:["(x-9)/3","(x+9)/3","3x+9","x/3+9"]},
+      {q:"f(x)=4-x². f(-3)=?",a:"-5",ch:["-5","-1","1","7"]},
+      {q:"Is y²=x a function? Yes/No",a:"No",ch:["Yes","No","Partially","Only for x>0"]},
+      {q:"f(x)=2x+7. f⁻¹(13)=?",a:"3",ch:["2","3","4","5"]},
+      {q:"Range of f(x)=2x+3?",a:"all reals",ch:["y>0","y≥0","all reals","y≥3"]}
+    ],
+    3:[
+      {q:"Simplify: x²·x³",a:"x⁵",ch:["x⁵","x⁶","2x⁵","x⁸"]},
+      {q:"Simplify: (x⁴)/(x²)",a:"x²",ch:["x²","x⁶","2x","x⁸"]},
+      {q:"Simplify: (2x)³",a:"8x³",ch:["2x³","6x³","8x³","6x"]},
+      {q:"Scientific notation: 45000",a:"4.5×10⁴",ch:["4.5×10³","4.5×10⁴","45×10³","4.5×10⁵"]},
+      {q:"Scientific notation: 0.0023",a:"2.3×10⁻³",ch:["2.3×10⁻²","2.3×10⁻³","23×10⁻⁴","2.3×10³"]},
+      {q:"Simplify: x⁰ (x≠0)",a:"1",ch:["0","1","x","undefined"]},
+      {q:"Simplify: (x²y)(xy³)",a:"x³y⁴",ch:["x³y³","x³y⁴","x²y⁴","x²y³"]},
+      {q:"8×10³ + 2×10³ = ?",a:"1×10⁴",ch:["10×10³","1×10⁴","8.2×10³","1×10⁶"]},
+      {q:"Simplify: (3x²)²",a:"9x⁴",ch:["6x⁴","9x²","9x⁴","3x⁴"]},
+      {q:"x⁻² = ?",a:"1/x²",ch:["x²","-x²","1/x²","-1/x²"]},
+      {q:"Simplify: (x³)/(x⁵)",a:"1/x²",ch:["x²","x⁸","1/x²","x¹⁵"]},
+      {q:"6.02×10²³ is?",a:"Avogadro's number",ch:["Pi","Avogadro's number","e","Euler's constant"]},
+      {q:"Simplify: (2x²)(3x⁴)",a:"6x⁶",ch:["5x⁶","6x⁶","6x⁸","5x⁸"]},
+      {q:"Scientific: 3.6×10⁻² = ?",a:"0.036",ch:["0.36","0.036","360","36"]},
+      {q:"Simplify: (xy²)³",a:"x³y⁶",ch:["x³y²","x³y⁶","xy⁶","3xy⁶"]},
+      {q:"Which is greatest: 3×10², 2×10³?",a:"2×10³",ch:["3×10²","2×10³","equal","cannot compare"]},
+      {q:"Simplify: (x/y)²",a:"x²/y²",ch:["x²/y","x/y²","x²/y²","2x/2y"]},
+      {q:"5×10⁴ × 3×10² = ?",a:"1.5×10⁷",ch:["1.5×10⁶","1.5×10⁷","15×10⁶","1.5×10⁸"]},
+      {q:"Simplify: (a²b)(ab²)",a:"a³b³",ch:["a²b²","a³b³","a³b","ab³"]},
+      {q:"x⁻¹ = ?",a:"1/x",ch:["x","-x","1/x","-1/x"]},
+      {q:"Simplify: √(x⁴)",a:"x²",ch:["x","2x","x²","x⁴"]},
+      {q:"6×10⁵ ÷ 2×10² = ?",a:"3×10³",ch:["3×10²","3×10³","4×10³","3×10⁷"]},
+      {q:"Simplify: (2x²y)²",a:"4x⁴y²",ch:["2x⁴y","4x⁴y","4x⁴y²","4x²y²"]},
+      {q:"Scientific: 0.000047 = ?",a:"4.7×10⁻⁵",ch:["4.7×10⁻⁴","4.7×10⁻⁵","47×10⁻⁶","4.7×10⁵"]},
+      {q:"Simplify: (x⁻¹)⁻¹",a:"x",ch:["1","x","-x","x²"]},
+      {q:"(5×10³)² = ?",a:"2.5×10⁷",ch:["1×10⁶","2.5×10⁶","2.5×10⁷","25×10⁶"]},
+      {q:"Simplify: ∛(x⁶)",a:"x²",ch:["x","x²","x³","3x"]},
+      {q:"4×10⁻³ × 5×10⁻² = ?",a:"2×10⁻⁴",ch:["2×10⁻⁵","2×10⁻⁴","9×10⁻⁵","20×10⁻⁶"]},
+      {q:"Simplify: (a³/a) ÷ a",a:"a",ch:["a","a²","a³","1/a"]},
+      {q:"Which is least: 5×10⁻³, 2×10⁻²?",a:"5×10⁻³",ch:["5×10⁻³","2×10⁻²","equal","cannot compare"]}
+    ],
+    4:[
+      {q:"Is 3x+y=6 linear? Yes/No",a:"Yes",ch:["Yes","No","Only for x>0","Sometimes"]},
+      {q:"y=x² is what type of curve?",a:"Parabola",ch:["Line","Parabola","Hyperbola","Ellipse"]},
+      {q:"Solve: x²-5x+6=0, smaller root",a:"2",ch:["1","2","3","6"]},
+      {q:"Vertex of y=x²-4x+3 is at x=?",a:"2",ch:["1","2","3","4"]},
+      {q:"Discriminant of x²+2x+1=0?",a:"0",ch:["-4","0","4","8"]},
+      {q:"Number of solutions if D>0?",a:"2",ch:["0","1","2","infinite"]},
+      {q:"Number of solutions if D<0?",a:"0",ch:["0","1","2","infinite"]},
+      {q:"Solve: x²=36",a:"±6",ch:["-6","6","±6","18"]},
+      {q:"Axis of symmetry: y=x²-6x+5",a:"x=3",ch:["x=2","x=3","x=5","x=6"]},
+      {q:"Complete square: x²+4x+? =perfect square",a:"4",ch:["2","4","8","16"]},
+      {q:"Solve: x²-7x+10=0, x=? (larger)",a:"5",ch:["2","5","7","10"]},
+      {q:"Direction of y=−x²?",a:"Opens down",ch:["Opens up","Opens down","Opens left","Opens right"]},
+      {q:"Discriminant b²-4ac when a=1,b=-5,c=6?",a:"1",ch:["0","1","4","25"]},
+      {q:"Solve x²+6x+9=0",a:"-3",ch:["-9","-3","3","9"]},
+      {q:"Min/Max of y=2x²-8x+7?",a:"Min at x=2",ch:["Max at x=2","Min at x=2","Min at x=4","Max at x=4"]},
+      {q:"Solve: x²=49",a:"±7",ch:["-7","7","±7","24.5"]},
+      {q:"y-intercept of y=x²-3x+2?",a:"2",ch:["-3","0","1","2"]},
+      {q:"Factor: x²-8x+16",a:"(x-4)²",ch:["(x-4)(x+4)","(x-4)²","(x-8)(x-2)","(x+4)²"]},
+      {q:"Axis of symmetry: y=-x²+4x-1",a:"x=2",ch:["x=1","x=2","x=4","x=-1"]},
+      {q:"Solve: 2x²-8=0",a:"±2",ch:["-2","2","±2","4"]},
+      {q:"Which is quadratic: A) 2x+1 B) x²-3",a:"B",ch:["A","B","Both","Neither"]},
+      {q:"Roots of x²-1=0?",a:"±1",ch:["-1","1","±1","0"]},
+      {q:"Vertex of y=(x-3)²+2?",a:"(3,2)",ch:["(-3,2)","(2,3)","(3,2)","(3,-2)"]},
+      {q:"Discriminant: x²+x+1=0?",a:"-3",ch:["-3","0","3","5"]},
+      {q:"Solve: x²-4x=0, x=? (non-zero)",a:"4",ch:["0","2","4","8"]},
+      {q:"y=x²+2x-3, zeroes at x=?",a:"1 and -3",ch:["1 and 3","1 and -3","-1 and 3","-1 and -3"]},
+      {q:"Expand (x-2)²=0, x=?",a:"2",ch:["-2","2","±2","4"]},
+      {q:"Parabola y=x²+4 shifts up how much?",a:"4",ch:["1","2","4","8"]},
+      {q:"Number of solutions if D=0?",a:"1",ch:["0","1","2","3"]},
+      {q:"Max value of y=-x²+4?",a:"4",ch:["-4","0","2","4"]}
+    ],
+    5:[
+      {q:"Translate: point (2,3) right 4?",a:"(6,3)",ch:["(2,7)","(6,3)","(-2,3)","(2,-1)"]},
+      {q:"Reflect (3,-2) over x-axis?",a:"(3,2)",ch:["(-3,-2)","(3,2)","(-3,2)","(2,-3)"]},
+      {q:"Rotate (1,0) 90° CCW?",a:"(0,1)",ch:["(0,1)","(0,-1)","(-1,0)","(1,0)"]},
+      {q:"Dilate (4,6) by scale 1/2?",a:"(2,3)",ch:["(2,3)","(8,12)","(2,6)","(4,3)"]},
+      {q:"Similar triangles: sides 3,4,5 & 6,8,?",a:"10",ch:["7","8","9","10"]},
+      {q:"Congruent means?",a:"Same size & shape",ch:["Same shape","Same size","Same size & shape","Proportional sides"]},
+      {q:"Translate (-1,4) left 3, down 2?",a:"(-4,2)",ch:["(-4,2)","(2,2)","-4,6)","(2,6)"]},
+      {q:"Reflect (5,3) over y-axis?",a:"(-5,3)",ch:["(-5,3)","(5,-3)","(-5,-3)","(5,3)"]},
+      {q:"Rotate (0,2) 180°?",a:"(0,-2)",ch:["(0,2)","(0,-2)","(2,0)","(-2,0)"]},
+      {q:"Dilate (3,9) by scale 3?",a:"(9,27)",ch:["(6,12)","(9,27)","(9,18)","(1,3)"]},
+      {q:"If ΔABC ~ ΔDEF, AB=4,DE=8,BC=5,EF=?",a:"10",ch:["7","9","10","12"]},
+      {q:"AA similarity requires?",a:"2 equal angles",ch:["3 equal angles","2 equal angles","equal sides","equal perimeters"]},
+      {q:"Translate (0,0) up 5, right 3?",a:"(3,5)",ch:["(3,5)","(5,3)","(-3,-5)","(0,0)"]},
+      {q:"Reflect (-2,-4) over origin?",a:"(2,4)",ch:["(2,4)","(-2,4)","(2,-4)","(-4,-2)"]},
+      {q:"Rotate (3,4) 90° CW?",a:"(4,-3)",ch:["(-4,3)","(4,-3)","-3,4)","(3,-4)"]},
+      {q:"Dilate perimeter 6 by scale 3?",a:"18",ch:["6","9","18","24"]},
+      {q:"Sides of 30-60-90 triangle shortest=1?",a:"1, √3, 2",ch:["1, √2, 2","1, √3, 2","1, 1, √2","1, 2, 3"]},
+      {q:"SSS congruence requires?",a:"All 3 sides equal",ch:["2 sides equal","2 sides + angle equal","All 3 sides equal","3 angles equal"]},
+      {q:"Translate (6,2) by (-3,4)?",a:"(3,6)",ch:["(3,6)","(9,6)","(3,-2)","-3,4)"]},
+      {q:"Reflect (4,0) over line y=x?",a:"(0,4)",ch:["(0,4)","(4,0)","(-4,0)","(0,-4)"]},
+      {q:"Rotate (2,3) 270° CCW = 90° CW?",a:"(3,-2)",ch:["(-3,2)","(3,-2)","(-2,-3)","(2,3)"]},
+      {q:"Dilate area 4 by scale 2: new area?",a:"16",ch:["6","8","12","16"]},
+      {q:"45-45-90: legs=5, hypotenuse=?",a:"5√2",ch:["5","5√2","10","5√3"]},
+      {q:"SAS congruence requires?",a:"2 sides + included angle",ch:["2 sides + any angle","2 angles + side","2 sides + included angle","3 sides"]},
+      {q:"Translate (-3,5) right 6, down 8?",a:"(3,-3)",ch:["(3,-3)","(-9,13)","-3,-3)","(3,13)"]},
+      {q:"Reflect (1,7) over x-axis?",a:"(1,-7)",ch:["(-1,7)","(1,-7)","(-1,-7)","(7,1)"]},
+      {q:"Scale factor 3, original area 5?",a:"45",ch:["15","30","45","60"]},
+      {q:"In similar figures, perimeters ratio = ?",a:"Scale factor",ch:["Square of scale","Scale factor","Half scale","Area ratio"]},
+      {q:"Rotate (4,1) 90° CCW?",a:"(-1,4)",ch:["(-1,4)","(1,-4)","(4,-1)","(-4,1)"]},
+      {q:"Hypotenuse in 30-60-90, short leg=6?",a:"12",ch:["6","8","12","6√3"]}
+    ]
+  }
+};
+
+const MONSTERS=[
+  {id:"goblin",n:"Goblin Scout",  s:"👺",hp:30, atk:5, el:"earth",   xp:20,atkMin:3,atkMax:8 },
+  {id:"troll", n:"Stone Troll",   s:"👹",hp:50, atk:8, el:"earth",   xp:35,atkMin:5,atkMax:12},
+  {id:"fimp",  n:"Fire Imp",      s:"😈",hp:35, atk:7, el:"fire",    xp:25,atkMin:4,atkMax:10},
+  {id:"wraith",n:"Water Wraith",  s:"👻",hp:40, atk:6, el:"water",   xp:30,atkMin:3,atkMax:9 },
+  {id:"hawk",  n:"Thunder Hawk",  s:"🦅",hp:45, atk:9, el:"electric",xp:40,atkMin:5,atkMax:13},
+  {id:"orc",   n:"Orc Raider",    s:"🐗",hp:55, atk:10,el:"earth",   xp:45,atkMin:5,atkMax:15},
+  {id:"shadow",n:"Shadow Mage",   s:"🧛",hp:65, atk:13,el:"fire",    xp:55,atkMin:8,atkMax:15,boss:1},
+  {id:"frost", n:"Frost Titan",   s:"🗿",hp:90, atk:15,el:"water",   xp:70,atkMin:10,atkMax:15,boss:1},
+  {id:"dragon",n:"Storm Drake",   s:"🐉",hp:130,atk:18,el:"electric",xp:120,atkMin:12,atkMax:18,boss:1,final:1}
+];
+const FOODS=[
+  {id:"berry", n:"Moonberry",      s:"🫐",hp:8, cost:10,desc:"Blessed by forest spirits",  rare:false},
+  {id:"bread", n:"Hearthloaf",     s:"🍞",hp:12,cost:15,desc:"Baked in village hearth",     rare:false},
+  {id:"stew",  n:"Wizard's Stew",  s:"🍲",hp:20,cost:25,desc:"Magical herb stew",           rare:false},
+  {id:"elixir",n:"Vital Elixir",   s:"🧪",hp:25,cost:38,desc:"Full restoration potion",     rare:false},
+  {id:"apple", n:"Enchanted Apple",s:"🍎",hp:5, cost:22,desc:"⭐ RARE — Elder Tree apple, hard to find!",rare:true}
+];
+const DISGUISES=[
+  {id:"fire_cloak",  n:"Flame Cloak",s:"🧥",el:"fire"},
+  {id:"water_veil",  n:"Tidal Veil", s:"🌊",el:"water"},
+  {id:"thunder_mask",n:"Storm Mask", s:"⚡",el:"electric"},
+  {id:"earth_shroud",n:"Root Shroud",s:"🌿",el:"earth"}
+];
+const VILLAGES=[
+  {id:"v1",n:"Embervale", el:"fire",    food:["berry","stew","apple"],        disguise:"water_veil",   guardian:"🧝",guardianName:"Elder Pyrus",   desc:"Smoke rises from squat stone huts. Wooden carts line the road. Apple trees bloom red in the ember-lit air."},
+  {id:"v2",n:"Tidehaven", el:"water",   food:["bread","elixir","berry"],      disguise:"fire_cloak",   guardian:"🧜",guardianName:"Warden Marea",  desc:"Crystal streams wind past willow-draped cottages. Fishermen haul silver nets. Moonberries glow along the bank."},
+  {id:"v3",n:"Stormspire",el:"electric",food:["bread","berry","stew"],        disguise:"earth_shroud", guardian:"🧙",guardianName:"Sage Voltmere",desc:"Copper towers crackle overhead. Straw huts glow with arcane light. Storm-bread is sold at every market stall."},
+  {id:"v4",n:"Rootmere",  el:"earth",   food:["apple","bread","stew","elixir"],disguise:"thunder_mask",guardian:"🌳",guardianName:"Keeper Mosswarden",desc:"Ancient oaks form a cathedral canopy. Moss-covered doorways frame root-twisted homes. Hedgehogs watch from berry bushes."}
+];
+
+const BRANCH_MAP={
+  2:[{label:"Forest Path",  icon:"🌲",nextId:3  },{label:"River Road",       icon:"🌊",nextId:"3b"}],
+  "3b":[{label:"Ancient Bridge",icon:"🌉",nextId:4},{label:"Swamp Trail",icon:"🌿",nextId:"4b"}],
+  5:[{label:"Mountain Pass",icon:"🏔️",nextId:6  },{label:"Dark Forest",      icon:"🌑",nextId:"6b"}],
+  7:[{label:"Ruined Tower", icon:"🗼",nextId:8  },{label:"Hidden Cave",      icon:"⛏️",nextId:"8b"}],
+  9:[{label:"Storm Peak",   icon:"⛈️",nextId:10 },{label:"Lightning Fields", icon:"⚡",nextId:"10b"}]
+};
+const ALL_NODES={
+  0:    {id:0,   x:8, y:75,type:"start",  label:"Shire's Gate",  s:"🏠"},
+  1:    {id:1,   x:18,y:65,type:"village",vid:"v1",label:"Embervale", s:"🏘️"},
+  2:    {id:2,   x:26,y:54,type:"monster",mid:"goblin",label:"Goblin Camp",s:"⚔️"},
+  3:    {id:3,   x:35,y:44,type:"monster",mid:"fimp",  label:"Imp Hollow",  s:"⚔️"},
+  "3b": {id:"3b",x:35,y:62,type:"monster",mid:"orc",   label:"Orc Quarry",  s:"⚔️"},
+  4:    {id:4,   x:44,y:36,type:"village",vid:"v2",label:"Tidehaven", s:"🏘️"},
+  "4b": {id:"4b",x:44,y:60,type:"treasure",label:"Swamp Ruins",s:"💎"},
+  5:    {id:5,   x:52,y:44,type:"monster",mid:"troll", label:"Troll Bridge",s:"⚔️"},
+  6:    {id:6,   x:60,y:32,type:"treasure",label:"Mountain Ruins",s:"💎"},
+  "6b": {id:"6b",x:60,y:56,type:"monster",mid:"wraith",label:"Wraith Bog",  s:"⚔️"},
+  7:    {id:7,   x:67,y:44,type:"monster",mid:"hawk",  label:"Hawk Peaks",  s:"⚔️"},
+  8:    {id:8,   x:74,y:56,type:"village",vid:"v3",label:"Stormspire",s:"🏘️"},
+  "8b": {id:"8b",x:74,y:34,type:"village",vid:"v4",label:"Rootmere",  s:"🏘️"},
+  9:    {id:9,   x:80,y:44,type:"monster",mid:"shadow",label:"Shadow Tower",s:"🗼",boss:1},
+  10:   {id:10,  x:89,y:30,type:"boss",   mid:"dragon",label:"Dragon's Peak",s:"🐉",final:1},
+  "10b":{id:"10b",x:89,y:56,type:"monster",mid:"frost",label:"Frost Citadel",s:"❄️",boss:1}
+};
+const DEFAULT_PATH=[0,1,2,3,4,5,6,7,8,9,10];
+
+// ═══════════════════════════════════
+// STATE
+// ═══════════════════════════════════
+let G={
+  screen:"loading",player:null,path:[0],currentNodeId:0,
+  pendingBranch:null,combat:null,activeVillage:null,
+  showTutorial:false,tutStep:0,showInventory:false,
+  result:null,monstersKilled:0,adPending:false,
+  stage:1,level:1,
+  // Per-grade per-level question tracking: G.qUsed[grade][level] = Set of indices used
+  qUsed:{}
+};
+
+function save(){
+  try{
+    const qU={};
+    Object.keys(G.qUsed).forEach(g=>{
+      qU[g]={};
+      Object.keys(G.qUsed[g]).forEach(l=>{qU[g][l]=[...G.qUsed[g][l]];});
+    });
+    localStorage.setItem("mte_v5",JSON.stringify({player:G.player,path:G.path,currentNodeId:G.currentNodeId,monstersKilled:G.monstersKilled,stage:G.stage,level:G.level,qUsed:qU}));
+  }catch(e){}
+}
+function loadSave(){
+  try{
+    const s=localStorage.getItem("mte_v5");
+    if(!s)return null;
+    const d=JSON.parse(s);
+    // Reconstitute sets
+    const qU={};
+    if(d.qUsed){Object.keys(d.qUsed).forEach(g=>{qU[g]={};Object.keys(d.qUsed[g]).forEach(l=>{qU[g][l]=new Set(d.qUsed[g][l]);});});}
+    d.qUsed=qU;
+    return d;
+  }catch(e){return null;}
+}
+
+function initQUsed(){G.qUsed={};}
+function getQ(grade,level){
+  const g=String(grade),l=String(level);
+  if(!G.qUsed[g])G.qUsed[g]={};
+  if(!G.qUsed[g][l])G.qUsed[g][l]=new Set();
+  const pool=(ALL_QUESTIONS[grade]||ALL_QUESTIONS[7])[level]||[];
+  let available=pool.map((_,i)=>i).filter(i=>!G.qUsed[g][l].has(i));
+  if(available.length===0){G.qUsed[g][l]=new Set();available=pool.map((_,i)=>i);}
+  const idx=available[Math.floor(Math.random()*available.length)];
+  G.qUsed[g][l].add(idx);
+  const q=pool[idx];
+  // shuffle choices
+  const chs=[...q.ch].sort(()=>Math.random()-.5);
+  return{...q,ch:chs};
+}
+
+function getEl(e){return EL[e]||EL.fire;}
+function getMonster(id){return MONSTERS.find(m=>m.id===id)||MONSTERS[0];}
+function getVillage(id){return VILLAGES.find(v=>v.id===id);}
+function getNode(id){return ALL_NODES[id];}
+function getAvatar(p){return p?AVATARS[p.gender||"male"][p.element||"fire"]:{n:"Hero",t:"Adventurer"};}
+function rand(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
+
+// ═══════════════════════════════════
+// DOM HELPER
+// ═══════════════════════════════════
+const app=document.getElementById("app");
+function h(tag,attrs,children){
+  attrs=attrs||{};children=children||[];
+  const el=document.createElement(tag);
+  for(const[k,v] of Object.entries(attrs)){
+    if(k==="style"&&typeof v==="object")Object.assign(el.style,v);
+    else if(k.startsWith("on")&&typeof v==="function")el.addEventListener(k.slice(2).toLowerCase(),v);
+    else el.setAttribute(k,v);
+  }
+  for(const c of[].concat(children)){
+    if(c==null||c===false||c===undefined)continue;
+    el.appendChild(typeof c==="string"?document.createTextNode(c):c);
+  }
+  return el;
+}
+function hbar(label,cur,max,color,glow){
+  const pct=Math.max(0,Math.min(100,(cur/max)*100));
+  return h("div",{style:{marginBottom:"5px"}},[
+    h("div",{class:"hbar-label"},[h("span",{},[label]),h("span",{},[Math.ceil(cur)+"/"+max])]),
+    h("div",{class:"hbar-track"},[h("div",{class:"hbar-fill",style:{width:pct+"%",background:color,boxShadow:"0 0 6px "+glow}})])
+  ]);
+}
+function render(){
+  app.innerHTML="";
+  const s=G.screen;
+  if(s==="loading")return renderLoading();
+  if(s==="create")return renderCreate();
+  if(s==="main")return renderMain();
+  if(s==="combat")return renderCombat();
+  if(s==="village")return renderVillage();
+  if(s==="result")return renderResult();
+  if(s==="branch")return renderBranch();
+  if(s==="boss_victory")return renderBossVictory();
+  if(s==="ad")return renderAd();
+}
+
+// ═══════════════════════════════════
+// LOADING
+// ═══════════════════════════════════
+function renderLoading(){
+  let prog=0;
+  const phrases=["Kindling the forge fires...","Awakening ancient tomes...","Summoning the World Tree...","The realm of Arithmia stirs..."];
+  const formulas=["3x + 7 = 22","a² + b² = c²","y = mx + b","√144 = 12"];
+  const div=h("div",{style:{position:"absolute",inset:"0",background:"radial-gradient(ellipse at 50% 60%,#200a00 0%,#0a0400 50%,#030200 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",overflow:"hidden"}});
+  // Stars
+  for(let i=0;i<40;i++){div.appendChild(h("div",{style:{position:"absolute",left:`${Math.random()*100}%`,top:`${Math.random()*90}%`,width:"2px",height:"2px",borderRadius:"50%",background:`rgba(255,230,160,${0.3+Math.random()*.6})`,animation:`starTwinkle ${1.5+Math.random()*3}s ease-in-out ${Math.random()*3}s infinite`,pointerEvents:"none"}}));}
+  // Runes
+  ["∑","∫","π","√","∞","Δ","θ","λ","2³","x²","∂","y=mx"].forEach((r,i)=>{
+    div.appendChild(h("span",{style:{position:"absolute",left:`${5+(i*8.1)%88}%`,top:`${8+(i*7.3)%80}%`,fontSize:`${14+(i%3)*8}px`,color:`hsla(${25+i*15},75%,60%,.22)`,animation:`floatUp ${3+i%3}s ease-in-out ${i*.4}s infinite`,fontStyle:"normal",pointerEvents:"none"}},[r]));
+  });
+  const tree=h("div",{style:{fontSize:"80px",lineHeight:"1",marginBottom:"8px",animation:"titleGlow 2.5s ease-in-out infinite"}},["🌳"]);
+  const orbs=h("div",{style:{display:"flex",gap:"14px",marginBottom:"10px"}});
+  Object.values(EL).forEach(e=>orbs.appendChild(h("div",{style:{fontSize:"22px",animation:"floatUp 2.5s ease-in-out infinite",filter:`drop-shadow(0 0 6px ${e.g})`}},[e.icon])));
+  const tw=h("div",{style:{textAlign:"center",marginBottom:"8px"}});
+  tw.innerHTML=`<div style="font-size:38px;font-weight:900;letter-spacing:3px;background:linear-gradient(135deg,#FF8C00,#FFD700,#FF4500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.1">MATH</div><div style="font-size:20px;font-weight:700;letter-spacing:5px;color:#C0A060">✦ THE ELEMENTS ✦</div>`;
+  const fd=h("div",{style:{background:"rgba(255,140,0,.1)",border:"1px solid rgba(255,140,0,.3)",borderRadius:"10px",padding:"7px 22px",marginBottom:"18px",color:"#FFB347",fontSize:"13px",fontFamily:"monospace",letterSpacing:"1px"}},[formulas[0]]);
+  const track=h("div",{style:{width:"260px",height:"8px",background:"rgba(255,255,255,.1)",borderRadius:"6px",border:"1px solid rgba(255,140,0,.3)",overflow:"hidden",marginBottom:"10px"}});
+  const fill=h("div",{style:{width:"0%",height:"100%",background:"linear-gradient(90deg,#FF4500,#FFD700)",borderRadius:"6px",transition:"width .1s",boxShadow:"0 0 10px #FFa040"}});
+  track.appendChild(fill);
+  const ph=h("div",{style:{color:"#A0876A",fontSize:"12px",fontStyle:"italic"}},[phrases[0]]);
+  [tree,orbs,tw,fd,track,ph].forEach(e=>div.appendChild(e));
+  app.appendChild(div);
+  const iv=setInterval(()=>{
+    prog+=1.5+Math.random()*2;
+    if(prog>=100){
+      prog=100;clearInterval(iv);
+      setTimeout(()=>{
+        const sv=loadSave();
+        if(sv&&sv.player){
+          G.player=sv.player;G.path=sv.path||[0];G.currentNodeId=sv.currentNodeId||0;
+          G.monstersKilled=sv.monstersKilled||0;G.stage=sv.stage||1;G.level=sv.level||1;
+          G.qUsed=sv.qUsed||{};G.screen="main";SFX.explore();
+        }else{G.screen="create";}
+        render();
+      },500);
+    }
+    fill.style.width=prog+"%";
+    const pi=Math.min(3,Math.floor(prog/25));
+    fd.textContent=formulas[pi]||formulas[3];ph.textContent=phrases[pi]||phrases[3];
+  },60);
+}
+
+// ═══════════════════════════════════
+// CHARACTER CREATE
+// ═══════════════════════════════════
+let CC={step:0,name:"",gender:null,element:null,path:null,grade:null};
+function renderCreate(){
+  const el=CC.element?getEl(CC.element):EL.fire;
+  const div=h("div",{style:{position:"absolute",inset:"0",background:`radial-gradient(ellipse at center,${el.bg} 0%,#050300 100%)`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"14px",overflowY:"auto",transition:"background .8s"}});
+  const card=h("div",{style:{width:"100%",maxWidth:"400px",animation:"fadeIn .4s ease-out"}});
+  const td=h("div",{style:{textAlign:"center",marginBottom:"16px"}});
+  td.innerHTML=`<div style="font-size:22px;font-weight:900;background:linear-gradient(135deg,#FF8C00,#FFD700);-webkit-background-clip:text;-webkit-text-fill-color:transparent">✦ MATH: THE ELEMENTS ✦</div><div style="color:#A0876A;font-size:12px;font-style:italic">Forge Your Legend</div>`;
+  card.appendChild(td);
+  // Step dots
+  const dotsDiv=h("div",{style:{display:"flex",justifyContent:"center",gap:"5px",marginBottom:"16px"}});
+  ["Name","Gender","Path","Element","Grade"].forEach((s,i)=>{
+    const done=i<CC.step,active=i===CC.step;
+    dotsDiv.appendChild(h("div",{style:{textAlign:"center"}},[
+      h("div",{style:{width:"28px",height:"28px",borderRadius:"50%",background:done?el.c:active?`${el.c}33`:"rgba(255,255,255,.07)",border:`2px solid ${done||active?el.c:"rgba(255,255,255,.2)"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"11px",color:done||active?"#fff":"#555",boxShadow:active?`0 0 10px ${el.g}`:"none",margin:"0 auto"}},[done?"✓":""+(i+1)]),
+      h("div",{style:{fontSize:"8px",color:active?el.c:"#444",marginTop:"2px"}},[s])
+    ]));
+  });
+  card.appendChild(dotsDiv);
+  const inner=h("div",{class:"card",style:{border:`1px solid ${el.c}44`,boxShadow:`0 0 25px ${el.g}18`,marginBottom:"12px"}});
+
+  if(CC.step===0){
+    inner.appendChild(h("div",{style:{color:"#C0A060",fontSize:"15px",marginBottom:"12px",textAlign:"center"}},["📜 What is your name, adventurer?"]));
+    const inp=h("input",{type:"text",placeholder:"Enter your name...",maxlength:"20",style:{width:"100%",padding:"12px 16px",borderRadius:"8px",background:"rgba(255,255,255,.06)",border:`1px solid ${el.c}55`,color:"#FFE4B5",fontSize:"17px",textAlign:"center"}});
+    inp.value=CC.name;
+    inp.addEventListener("input",e=>{CC.name=e.target.value;});
+    inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&CC.name.trim().length>1){CC.step=1;renderCreate();}});
+    inner.appendChild(inp);
+    if(CC.name.trim().length>1)inner.appendChild(h("div",{style:{textAlign:"center",color:el.c,fontSize:"13px",marginTop:"8px",fontStyle:"italic"}},["\"Welcome, "+CC.name.trim()+"...\""]));
+    setTimeout(()=>inp.focus(),100);
+  }
+  else if(CC.step===1){
+    inner.appendChild(h("div",{style:{color:"#C0A060",fontSize:"15px",marginBottom:"14px",textAlign:"center"}},["⚔️ Choose your lineage, "+CC.name+":"]));
+    const grid=h("div",{style:{display:"flex",gap:"10px"}});
+    [{v:"male",label:"Warrior",icon:"🧙‍♂️",desc:"Bold & steadfast"},{v:"female",label:"Sorceress",icon:"🧙‍♀️",desc:"Wise & swift"}].forEach(opt=>{
+      const sel=CC.gender===opt.v;
+      const btn=h("button",{style:{flex:"1",padding:"16px 8px",borderRadius:"12px",background:sel?`${el.c}33`:"rgba(255,255,255,.04)",border:`2px solid ${sel?el.c:"rgba(255,255,255,.14)"}`,color:"#FFE4B5",textAlign:"center",cursor:"pointer",transition:"all .2s",boxShadow:sel?`0 0 14px ${el.g}44`:"none"}},[h("div",{style:{fontSize:"36px"}},[opt.icon]),h("div",{style:{fontWeight:"700",fontSize:"13px",marginTop:"5px"}},[opt.label]),h("div",{style:{fontSize:"10px",color:"#888",fontStyle:"italic"}},[opt.desc])]);
+      btn.addEventListener("click",()=>{CC.gender=opt.v;SFX.click();renderCreate();});
+      grid.appendChild(btn);
+    });
+    inner.appendChild(grid);
+  }
+  else if(CC.step===2){
+    inner.appendChild(h("div",{style:{color:"#C0A060",fontSize:"15px",marginBottom:"12px",textAlign:"center"}},["🛤️ Choose your path:"]));
+    const grid=h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}});
+    Object.entries(PATHS).forEach(([k,p])=>{
+      const sel=CC.path===k;
+      const btn=h("button",{style:{padding:"12px 8px",borderRadius:"12px",background:sel?`${el.c}33`:"rgba(255,255,255,.04)",border:`2px solid ${sel?el.c:"rgba(255,255,255,.12)"}`,color:"#FFE4B5",cursor:"pointer",transition:"all .2s",boxShadow:sel?`0 0 12px ${el.g}44`:"none",textAlign:"center"}},[
+        h("div",{style:{fontSize:"26px"}},[p.icon]),
+        h("div",{style:{fontWeight:"700",fontSize:"12px",color:sel?el.c:"#FFE4B5",margin:"4px 0 2px"}},[p.label]),
+        h("div",{style:{fontSize:"9px",color:"#888",fontStyle:"italic",lineHeight:"1.3"}},[p.desc]),
+        h("div",{style:{fontSize:"10px",color:"#FFD700",marginTop:"3px"}},[p.bonus])
+      ]);
+      btn.addEventListener("click",()=>{CC.path=k;SFX.click();renderCreate();});
+      grid.appendChild(btn);
+    });
+    inner.appendChild(grid);
+  }
+  else if(CC.step===3){
+    inner.appendChild(h("div",{style:{color:"#C0A060",fontSize:"15px",marginBottom:"12px",textAlign:"center"}},["🌟 Choose your element:"]));
+    const grid=h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"}});
+    Object.entries(EL).forEach(([k,v])=>{
+      const av=AVATARS[CC.gender||"male"][k];
+      const sel=CC.element===k;
+      const btn=h("button",{style:{padding:"14px 8px",borderRadius:"12px",background:sel?`${v.c}33`:"rgba(255,255,255,.04)",border:`2px solid ${sel?v.c:"rgba(255,255,255,.12)"}`,color:"#FFE4B5",cursor:"pointer",transition:"all .2s",boxShadow:sel?`0 0 14px ${v.g}44`:"none",textAlign:"center"}},[h("div",{style:{fontSize:"28px"}},[v.icon]),h("div",{style:{fontWeight:"700",fontSize:"12px",color:v.c,margin:"4px 0 1px"}},[v.name]),h("div",{style:{fontSize:"9px",color:"#777"}},[av.t])]);
+      btn.addEventListener("click",()=>{CC.element=k;SFX.click();renderCreate();});
+      grid.appendChild(btn);
+    });
+    inner.appendChild(grid);
+    if(CC.element&&CC.gender){const av=AVATARS[CC.gender][CC.element];inner.appendChild(h("div",{style:{textAlign:"center",color:el.c,marginTop:"10px",fontSize:"12px",fontStyle:"italic"}},["You are "+av.n+", the "+av.t]));}
+  }
+  else if(CC.step===4){
+    inner.appendChild(h("div",{style:{color:"#C0A060",fontSize:"15px",marginBottom:"12px",textAlign:"center"}},["📚 Choose your knowledge tier:"]));
+    [{g:6,label:"6th Grade",tier:"Apprentice Mage",desc:"Fractions · Percentages · Ratios · Basic algebra"},
+     {g:7,label:"7th Grade",tier:"Journeyman Sage",desc:"Linear equations · Geometry · Systems · Quadratics"},
+     {g:8,label:"8th Grade",tier:"Master Arcanist",desc:"Functions · Exponents · Transformations · Quadratics"}].forEach(opt=>{
+      const sel=CC.grade===opt.g;
+      const btn=h("button",{style:{display:"block",width:"100%",padding:"13px 16px",marginBottom:"9px",borderRadius:"12px",background:sel?`${el.c}33`:"rgba(255,255,255,.04)",border:`2px solid ${sel?el.c:"rgba(255,255,255,.12)"}`,color:"#FFE4B5",cursor:"pointer",textAlign:"left",transition:"all .2s",boxShadow:sel?`0 0 14px ${el.g}44`:"none"}},[
+        h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},[h("span",{style:{fontWeight:"700",fontSize:"14px"}},[opt.label]),h("span",{style:{fontSize:"10px",color:el.c}},[opt.tier])]),
+        h("div",{style:{fontSize:"10px",color:"#888",marginTop:"3px",fontStyle:"italic"}},[opt.desc])
+      ]);
+      btn.addEventListener("click",()=>{CC.grade=opt.g;SFX.click();renderCreate();});
+      inner.appendChild(btn);
+    });
+  }
+  card.appendChild(inner);
+  const canNext=[CC.name.trim().length>1,CC.gender!==null,CC.path!==null,CC.element!==null,CC.grade!==null][CC.step];
+  const navDiv=h("div",{style:{display:"flex",gap:"10px",width:"100%",maxWidth:"400px"}});
+  if(CC.step>0){
+    const bk=h("button",{style:{flex:"1",padding:"12px",borderRadius:"10px",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.16)",color:"#aaa",cursor:"pointer",fontSize:"14px"}},["← Back"]);
+    bk.addEventListener("click",()=>{CC.step--;SFX.click();renderCreate();});
+    navDiv.appendChild(bk);
+  }
+  const nx=h("button",{style:{flex:"2",padding:"12px",borderRadius:"10px",background:canNext?`linear-gradient(135deg,${el.c},${el.g})`:"rgba(255,255,255,.07)",border:"none",color:canNext?"#000":"#444",cursor:canNext?"pointer":"not-allowed",fontWeight:"700",fontSize:"15px",boxShadow:canNext?`0 0 14px ${el.g}55`:"none",transition:"all .2s"}},[CC.step<4?"Continue →":"⚔️ Begin Adventure!"]);
+  nx.addEventListener("click",()=>{
+    if(!canNext)return;SFX.click();
+    if(CC.step<4){CC.step++;renderCreate();}
+    else{
+      const maxEn=CC.path==="paladin"?30:25;
+      G.player={name:CC.name.trim(),gender:CC.gender,element:CC.element,path:CC.path,grade:CC.grade,energy:maxEn,maxEnergy:maxEn,gold:60,inventory:[],disguises:[],monstersKilled:0};
+      G.path=[0];G.currentNodeId=0;G.monstersKilled=0;initQUsed();G.stage=1;G.level=1;
+      G.screen="main";G.showTutorial=true;G.tutStep=0;
+      SFX.explore();save();render();
+    }
+  });
+  navDiv.appendChild(nx);card.appendChild(navDiv);
+  div.appendChild(card);app.appendChild(div);
+}
+
+// ═══════════════════════════════════
+// TUTORIAL
+// ═══════════════════════════════════
+const TUT=[
+  {icon:"⚔️",title:"Welcome, Hero!",text:"Try to Reach the Boss! Answer math questions to battle monsters. Correct answers deal damage — wrong answers give the monster a free attack on you!"},
+  {icon:"🗺️",title:"The World Map",text:"Follow the glowing path through the realm of Arithmia. After each battle you choose your next route — different paths lead to different villages, monsters, and hidden treasure!"},
+  {icon:"🏘️",title:"Villages & Elements",text:"Each of the four villages (Embervale, Tidehaven, Stormspire, Rootmere) has an element. Enter your own element's village freely. Collect disguises found along the path to enter others!"},
+  {icon:"🍎",title:"Finding Food",text:"Food restores energy! Visit villages and buy from the market stall. Hearthloaf and stew are common. Enchanted Apples are VERY RARE — most shops don't stock them and they cost more gold. Stock up whenever you find them!"},
+  {icon:"🌲",title:"Branching Paths",text:"After most battles you'll see a fork in the road. Choose wisely — paths fork toward villages (for rest and food), monster camps, or ancient treasure ruins hidden in the wilderness."},
+  {icon:"🐉",title:"The Final Boss",text:"At Dragon's Peak lurks the fearsome Storm Drake — the Final Boss! Defeat it to complete Stage 1 and unlock Stage 2. Make sure your energy is full before the fight. The boss hits hard and has 130 HP!"}
+];
+function renderTutorial(){
+  const step=TUT[G.tutStep];
+  const el=G.player?getEl(G.player.element):EL.fire;
+  const ov=h("div",{style:{position:"absolute",inset:"0",background:"rgba(0,0,0,.84)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:"100",padding:"16px"}});
+  const card=h("div",{style:{background:`radial-gradient(ellipse,${el.bg} 0%,#050300 100%)`,border:`1px solid ${el.c}66`,borderRadius:"18px",padding:"26px",maxWidth:"360px",width:"100%",boxShadow:`0 0 35px ${el.g}28`,textAlign:"center",animation:"slideUp .3s ease-out"}});
+  const dots=h("div",{style:{display:"flex",justifyContent:"center",gap:"6px",marginBottom:"16px"}});
+  TUT.forEach((_,i)=>dots.appendChild(h("div",{style:{width:"8px",height:"8px",borderRadius:"50%",background:i<=G.tutStep?el.c:"rgba(255,255,255,.15)",boxShadow:i===G.tutStep?`0 0 8px ${el.g}`:"none"}})));
+  card.appendChild(dots);
+  card.appendChild(h("div",{style:{fontSize:"50px",marginBottom:"10px"}},[step.icon]));
+  card.appendChild(h("div",{style:{fontSize:"18px",fontWeight:"700",color:el.c,marginBottom:"10px"}},[step.title]));
+  card.appendChild(h("div",{style:{color:"#D4C4A0",fontSize:"13px",lineHeight:"1.75",fontStyle:"italic"}},[step.text]));
+  const btns=h("div",{style:{display:"flex",gap:"8px",marginTop:"18px"}});
+  if(G.tutStep>0){
+    const bk=h("button",{style:{padding:"9px 14px",borderRadius:"8px",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.15)",color:"#888",cursor:"pointer",fontSize:"13px"}},["← Back"]);
+    bk.addEventListener("click",()=>{G.tutStep--;SFX.click();render();});btns.appendChild(bk);
+  }
+  const sk=h("button",{style:{padding:"9px 14px",borderRadius:"8px",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.15)",color:"#888",cursor:"pointer",fontSize:"12px"}},["Skip"]);
+  sk.addEventListener("click",()=>{G.showTutorial=false;SFX.click();render();});
+  const nx=h("button",{style:{flex:"1",padding:"10px",borderRadius:"8px",background:`linear-gradient(135deg,${el.c},${el.g})`,border:"none",color:"#000",cursor:"pointer",fontWeight:"700",fontSize:"14px",boxShadow:`0 0 12px ${el.g}55`}},[G.tutStep<TUT.length-1?"Next →":"⚔️ Begin Quest!"]);
+  nx.addEventListener("click",()=>{SFX.click();if(G.tutStep<TUT.length-1){G.tutStep++;render();}else{G.showTutorial=false;render();}});
+  btns.appendChild(sk);btns.appendChild(nx);card.appendChild(btns);
+  ov.appendChild(card);app.appendChild(ov);
+}
+
+// ═══════════════════════════════════
+// WORLD MAP — Realistic background
+// ═══════════════════════════════════
+function renderMain(){
+  const p=G.player;const el=getEl(p.element);
+  const div=h("div",{style:{position:"absolute",inset:"0",display:"flex",flexDirection:"column"}});
+
+  // ── Rich painted map background ──
+  const bg=h("div",{style:{position:"absolute",inset:"0",overflow:"hidden",zIndex:"0"}});
+  // Multi-layer sky gradient
+  bg.appendChild(h("div",{style:{position:"absolute",inset:"0",background:"linear-gradient(180deg,#0d1f09 0%,#0a1a08 25%,#081506 55%,#050d04 100%)"}}));
+  // Distant fog layer
+  bg.appendChild(h("div",{style:{position:"absolute",inset:"0",background:"radial-gradient(ellipse at 50% 20%,rgba(80,120,60,.08) 0%,transparent 60%)",pointerEvents:"none"}}));
+  // Mountain silhouettes (SVG)
+  bg.innerHTML+=`<svg style="position:absolute;bottom:18%;left:0;width:100%;height:45%;opacity:.4;pointer-events:none" viewBox="0 0 400 140" preserveAspectRatio="none">
+    <polygon points="0,140 45,35 90,90 145,18 195,75 245,28 295,70 345,12 395,50 400,40 400,140" fill="#0f2a08"/>
+    <polygon points="0,140 35,65 75,95 120,48 165,85 215,55 265,80 315,35 365,65 400,45 400,140" fill="#0a1f05" opacity=".7"/>
+    <polygon points="0,140 0,120 50,110 120,100 200,95 280,105 360,98 400,110 400,140" fill="#061208" opacity=".8"/>
+  </svg>`;
+  // Deep forest floor (bottom)
+  bg.innerHTML+=`<svg style="position:absolute;bottom:0;left:0;width:100%;height:22%;opacity:.6;pointer-events:none" viewBox="0 0 400 60" preserveAspectRatio="none">
+    <rect width="400" height="60" fill="#040c03"/>
+    <ellipse cx="40" cy="30" rx="30" ry="20" fill="#061008"/>
+    <ellipse cx="120" cy="25" rx="40" ry="25" fill="#050e04"/>
+    <ellipse cx="220" cy="30" rx="35" ry="22" fill="#071209"/>
+    <ellipse cx="320" cy="28" rx="38" ry="24" fill="#060f05"/>
+  </svg>`;
+  // Foreground tree silhouettes
+  bg.innerHTML+=`<svg style="position:absolute;bottom:0;left:0;width:100%;height:30%;opacity:.55;pointer-events:none" viewBox="0 0 400 90" preserveAspectRatio="none">
+    <polygon points="8,90 22,30 36,90" fill="#0a1a06"/>
+    <polygon points="30,90 48,10 66,90" fill="#081505"/>
+    <polygon points="90,90 105,38 120,90" fill="#0a1a06"/>
+    <polygon points="280,90 295,22 310,90" fill="#0a1a06"/>
+    <polygon points="320,90 340,8 360,90" fill="#081505"/>
+    <polygon points="365,90 378,35 391,90" fill="#0a1a06"/>
+    <rect x="0" y="80" width="400" height="10" fill="#061008"/>
+  </svg>`;
+  // Floating fireflies
+  for(let i=0;i<8;i++){bg.appendChild(h("div",{style:{position:"absolute",left:`${8+Math.random()*84}%`,top:`${30+Math.random()*55}%`,width:"3px",height:"3px",borderRadius:"50%",background:`rgba(${180+rand(0,75)},${200+rand(0,55)},${80+rand(0,40)},.85)`,boxShadow:"0 0 5px rgba(180,220,80,.7)",animation:`starTwinkle ${1.5+Math.random()*2}s ease-in-out ${Math.random()*3}s infinite`,pointerEvents:"none"}}));}
+  // Stars at top
+  for(let i=0;i<25;i++){bg.appendChild(h("div",{style:{position:"absolute",left:`${Math.random()*100}%`,top:`${Math.random()*25}%`,width:"2px",height:"2px",borderRadius:"50%",background:`rgba(220,240,180,${.2+Math.random()*.5})`,animation:`starTwinkle ${2+Math.random()*3}s ease-in-out ${Math.random()*3}s infinite`,pointerEvents:"none"}}));}
+  // Vignette
+  bg.appendChild(h("div",{style:{position:"absolute",inset:"0",background:"radial-gradient(ellipse at 50% 50%,transparent 30%,rgba(0,0,0,.65) 100%)",pointerEvents:"none"}}));
+  div.appendChild(bg);
+
+  // ── HUD ──
+  const av=getAvatar(p);
+  const hud=h("div",{style:{position:"relative",zIndex:"5",background:"rgba(0,0,0,.85)",borderBottom:`1px solid ${el.c}33`,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:"0",backdropFilter:"blur(8px)"}});
+  const hl=h("div",{style:{display:"flex",alignItems:"center",gap:"8px"}});
+  hl.appendChild(h("div",{style:{fontSize:"26px",filter:`drop-shadow(0 0 5px ${el.g})`}},[p.gender==="female"?"🧙‍♀️":"🧙‍♂️"]));
+  const hi=h("div",{});
+  hi.appendChild(h("div",{style:{fontWeight:"700",fontSize:"13px",color:el.c}},[p.name]));
+  hi.appendChild(h("div",{style:{fontSize:"10px",color:"#777"}},[el.icon+" "+(PATHS[p.path]?.icon||"")+" "+av.t]));
+  hl.appendChild(hi);
+  const hr=h("div",{style:{display:"flex",gap:"12px",alignItems:"center"}});
+  const enD=h("div",{style:{textAlign:"center"}});enD.appendChild(h("div",{style:{fontSize:"10px",color:"#777"}},["⚡ Energy"]));enD.appendChild(h("div",{style:{fontSize:"15px",fontWeight:"700",color:p.energy>8?"#90EE90":"#FF6B35"}},[p.energy+"/"+p.maxEnergy]));
+  const gD=h("div",{style:{textAlign:"center"}});gD.appendChild(h("div",{style:{fontSize:"10px",color:"#777"}},["💰 Gold"]));gD.appendChild(h("div",{style:{fontSize:"15px",fontWeight:"700",color:"#FFD700"}},[String(p.gold)]));
+  const invBtn=h("button",{style:{padding:"6px 10px",borderRadius:"8px",background:"rgba(255,255,255,.07)",border:`1px solid ${el.c}44`,color:el.c,cursor:"pointer",fontSize:"12px"}},["🎒"]);
+  invBtn.addEventListener("click",()=>{G.showInventory=true;SFX.click();render();});
+  hr.appendChild(enD);hr.appendChild(gD);hr.appendChild(invBtn);
+  hud.appendChild(hl);hud.appendChild(hr);div.appendChild(hud);
+
+  // Sub bar
+  const cur=getNode(G.currentNodeId);
+  const sub=h("div",{style:{position:"relative",zIndex:"5",padding:"5px 14px",background:"rgba(0,0,0,.6)",borderBottom:"1px solid rgba(255,255,255,.05)",display:"flex",justifyContent:"space-between",fontSize:"11px",color:"#777",flexShrink:"0",backdropFilter:"blur(4px)"}});
+  sub.appendChild(h("span",{},[`🗺️ Arithmia · ${cur?.label||""}`]));
+  sub.appendChild(h("span",{style:{color:el.c}},["Stage "+G.stage+" · Level "+G.level]));
+  div.appendChild(sub);
+
+  // ── MAP CANVAS ──
+  const mw=h("div",{style:{flex:"1",position:"relative",overflow:"hidden"}});
+  // SVG path lines
+  const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+  svg.setAttribute("style","position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2");
+  for(let i=0;i<G.path.length-1;i++){
+    const a=getNode(G.path[i]);const b=getNode(G.path[i+1]);
+    if(a&&b){
+      const line=document.createElementNS("http://www.w3.org/2000/svg","line");
+      line.setAttribute("x1",a.x+"%");line.setAttribute("y1",a.y+"%");
+      line.setAttribute("x2",b.x+"%");line.setAttribute("y2",b.y+"%");
+      line.setAttribute("stroke",el.c);line.setAttribute("stroke-width","2.5");
+      line.setAttribute("style",`filter:drop-shadow(0 0 4px ${el.g})`);
+      svg.appendChild(line);
+    }
+  }
+  const branches=BRANCH_MAP[G.currentNodeId];
+  if(branches){
+    const cn=getNode(G.currentNodeId);
+    branches.forEach(br=>{
+      const nb=getNode(br.nextId);
+      if(nb&&cn){
+        const line=document.createElementNS("http://www.w3.org/2000/svg","line");
+        line.setAttribute("x1",cn.x+"%");line.setAttribute("y1",cn.y+"%");
+        line.setAttribute("x2",nb.x+"%");line.setAttribute("y2",nb.y+"%");
+        line.setAttribute("stroke","rgba(255,255,255,.25)");line.setAttribute("stroke-width","1.5");
+        line.setAttribute("stroke-dasharray","5,4");
+        svg.appendChild(line);
+      }
+    });
+  }
+  mw.appendChild(svg);
+  G.path.forEach(nid=>{
+    const node=getNode(nid);if(!node)return;
+    const isCur=String(nid)===String(G.currentNodeId);
+    const isDone=G.path.indexOf(nid)<G.path.length-1;
+    const wrap=h("div",{style:{position:"absolute",left:`${node.x}%`,top:`${node.y}%`,transform:"translate(-50%,-50%)",zIndex:"3"}});
+    if(isCur){const arr=h("div",{style:{position:"absolute",top:"-14px",left:"50%",transform:"translateX(-50%)",fontSize:"11px",animation:"bounce 1s ease-in-out infinite",color:el.c}},["▼"]);wrap.appendChild(arr);}
+    const btn=h("button",{style:{width:"42px",height:"42px",borderRadius:"50%",background:isCur?`${el.c}55`:isDone?"rgba(50,200,50,.22)":"rgba(255,255,255,.08)",border:`2px solid ${isCur?el.c:isDone?"#32CD3266":"rgba(255,255,255,.2)"}`,fontSize:"18px",cursor:isCur?"pointer":"default",boxShadow:isCur?`0 0 18px ${el.g}`:"none",transition:"all .2s",display:"flex",alignItems:"center",justifyContent:"center",padding:"0"}},[isDone&&!isCur?"✓":node.s]);
+    if(isCur)btn.addEventListener("click",()=>{SFX.click();handleNodeAction(node);});
+    wrap.appendChild(btn);
+    wrap.appendChild(h("div",{style:{position:"absolute",bottom:"-18px",left:"50%",transform:"translateX(-50%)",fontSize:"7px",color:isCur?el.c:"#555",whiteSpace:"nowrap",textAlign:"center"}},[isCur?"▶ "+node.label:node.label]));
+    mw.appendChild(wrap);
+  });
+  div.appendChild(mw);
+
+  // Action bar
+  const act=h("div",{style:{position:"relative",zIndex:"5",padding:"12px 14px",background:"rgba(0,0,0,.9)",borderTop:`1px solid ${el.c}22`,flexShrink:"0",backdropFilter:"blur(8px)"}});
+  if(cur){
+    const txt=cur.type==="village"?"🏘️ Enter "+cur.label:cur.type==="monster"||cur.type==="boss"?"⚔️ Battle: "+cur.label:cur.type==="treasure"?"💎 Claim Treasure!":cur.type==="start"?"🏠 Begin your journey!":"Explore";
+    const btn=h("button",{style:{width:"100%",padding:"14px",borderRadius:"12px",background:`linear-gradient(135deg,${el.c},${el.g})`,border:"none",color:"#000",cursor:"pointer",fontWeight:"700",fontSize:"15px",boxShadow:`0 0 18px ${el.g}55`,letterSpacing:".5px"}},[txt]);
+    btn.addEventListener("click",()=>{SFX.click();handleNodeAction(cur);});
+    act.appendChild(btn);
+  }
+  div.appendChild(act);
+  app.appendChild(div);
+  if(G.showTutorial)renderTutorial();
+  if(G.showInventory)renderInventory();
+}
+
+function handleNodeAction(node){
+  if(node.type==="start"){const ni=DEFAULT_PATH[1];G.path=[0,ni];G.currentNodeId=ni;save();render();return;}
+  if(node.type==="village"){G.activeVillage=getVillage(node.vid);G.screen="village";SFX.village();render();return;}
+  if(node.type==="treasure"){G.player.gold+=35;G.result={won:true,xp:0,treasure:true};G.screen="result";SFX.victory();render();return;}
+  if(node.type==="monster"||node.type==="boss"){
+    const m=getMonster(node.mid);
+    G.combat={monster:{...m,curHp:m.hp},question:getQ(G.player.grade,G.level),selected:null,result:null,showHint:false,paused:false,playerHp:G.player.energy,streak:0,turn:0,dmgText:null,dmgSide:null,monsterTurn:false};
+    G.screen="combat";
+    if(node.boss||node.final)SFX.boss();else SFX.battle();
+    render();return;
+  }
+}
+
+function advanceOrBranch(){
+  const branches=BRANCH_MAP[G.currentNodeId];
+  if(branches){G.pendingBranch=branches;G.screen="branch";save();render();}
+  else{
+    const ci=DEFAULT_PATH.indexOf(G.currentNodeId);
+    const ni=ci>=0?DEFAULT_PATH[ci+1]:null;
+    if(ni!=null){
+      G.path=[...G.path,ni];G.currentNodeId=ni;
+      // Advance level counter
+      G.level=Math.min(5,Math.ceil(G.path.length/2));
+      save();SFX.explore();render();
+    }else{G.screen="boss_victory";render();}
+  }
+}
+
+// ═══════════════════════════════════
+// BRANCH CHOOSER
+// ═══════════════════════════════════
+function renderBranch(){
+  const p=G.player;const el=getEl(p.element);
+  SFX.explore();
+  const div=h("div",{style:{position:"absolute",inset:"0",background:`radial-gradient(ellipse at center,${el.bg} 0%,#050300 100%)`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px"}});
+  const card=h("div",{style:{width:"100%",maxWidth:"380px",animation:"fadeIn .4s ease-out"}});
+  const hdr=h("div",{style:{textAlign:"center",marginBottom:"20px"}});
+  hdr.appendChild(h("div",{style:{fontSize:"36px",marginBottom:"8px",animation:"floatUp 3s ease-in-out infinite"}},["🌲"]));
+  hdr.appendChild(h("div",{style:{fontSize:"20px",fontWeight:"700",color:el.c}},["Fork in the Road"]));
+  hdr.appendChild(h("div",{style:{color:"#A0876A",fontSize:"13px",fontStyle:"italic",marginTop:"4px"}},["Choose your path wisely, traveller..."]));
+  card.appendChild(hdr);
+  G.pendingBranch.forEach(br=>{
+    const tgt=getNode(br.nextId);
+    const tc={village:"#32CD32",monster:"#DC143C",boss:"#FFD700",treasure:"#FFD700"}[tgt?.type||"monster"];
+    const td={village:"Village ahead — rest & restock food",monster:"Monster encounter ahead",boss:"⚠️ Boss encounter — prepare yourself!",treasure:"Ancient treasure rumoured here..."}[tgt?.type||"monster"];
+    const btn=h("button",{style:{display:"block",width:"100%",padding:"18px 20px",marginBottom:"12px",borderRadius:"14px",background:"rgba(10,6,2,.88)",border:`2px solid ${el.c}44`,color:"#FFE4B5",cursor:"pointer",textAlign:"left",transition:"all .2s"}});
+    const inner=h("div",{style:{display:"flex",alignItems:"center",gap:"14px"}});
+    inner.appendChild(h("div",{style:{fontSize:"36px"}},[br.icon]));
+    const info=h("div",{});
+    info.appendChild(h("div",{style:{fontWeight:"700",fontSize:"16px"}},[br.label]));
+    info.appendChild(h("div",{style:{fontSize:"12px",color:tc,marginTop:"2px"}},[tgt?.label?"→ "+tgt.label:""]));
+    info.appendChild(h("div",{style:{fontSize:"10px",color:"#666",marginTop:"2px",fontStyle:"italic"}},[td]));
+    inner.appendChild(info);btn.appendChild(inner);
+    btn.addEventListener("mouseover",()=>{btn.style.background=`${el.c}22`;btn.style.borderColor=el.c;btn.style.transform="translateY(-2px)";});
+    btn.addEventListener("mouseout",()=>{btn.style.background="rgba(10,6,2,.88)";btn.style.borderColor=`${el.c}44`;btn.style.transform="";});
+    btn.addEventListener("click",()=>{SFX.click();G.path=[...G.path,br.nextId];G.currentNodeId=br.nextId;G.pendingBranch=null;G.level=Math.min(5,Math.ceil(G.path.length/2));G.screen="main";save();render();});
+    card.appendChild(btn);
+  });
+  div.appendChild(card);app.appendChild(div);
+}
+
+// ═══════════════════════════════════
+// 2D COMBAT — Forest battle scene
+// ═══════════════════════════════════
+function renderCombat(){
+  const p=G.player;const el=getEl(p.element);
+  const cb=G.combat;const m=cb.monster;const mel=getEl(m.el);
+  const isBoss=!!(m.boss||m.final);
+
+  const div=h("div",{style:{position:"absolute",inset:"0",display:"flex",flexDirection:"column",background:`radial-gradient(ellipse at center,${mel.bg} 0%,#020202 100%)`}});
+
+  // ── PAUSE OVERLAY ──
+  if(cb.paused){
+    const ov=h("div",{style:{position:"absolute",inset:"0",background:"rgba(0,0,0,.9)",backdropFilter:"blur(6px)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:"60",padding:"20px"}});
+    const pc=h("div",{style:{background:"rgba(10,6,2,.95)",border:`1px solid ${el.c}66`,borderRadius:"16px",padding:"28px",maxWidth:"300px",width:"100%",textAlign:"center"}});
+    pc.appendChild(h("div",{style:{fontSize:"36px",marginBottom:"10px"}},["⏸️"]));
+    pc.appendChild(h("div",{style:{fontSize:"20px",fontWeight:"700",color:el.c,marginBottom:"20px"}},["Battle Paused"]));
+    const rs=h("button",{style:{width:"100%",padding:"13px",borderRadius:"10px",background:`linear-gradient(135deg,${el.c},${el.g})`,border:"none",color:"#000",cursor:"pointer",fontWeight:"700",fontSize:"15px",marginBottom:"10px"}},["▶ Resume Battle"]);
+    rs.addEventListener("click",()=>{cb.paused=false;render();});
+    const fl=h("button",{style:{width:"100%",padding:"11px",borderRadius:"10px",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.15)",color:"#aaa",cursor:"pointer",fontSize:"13px"}},[p.path==="ranger"?"🏃 Flee (Ranger: Free!)":"🏃 Flee (−5 energy)"]);
+    fl.addEventListener("click",()=>{if(p.path!=="ranger")G.player.energy=Math.max(0,G.player.energy-5);G.screen="main";G.combat=null;SFX.explore();save();render();});
+    pc.appendChild(rs);pc.appendChild(fl);ov.appendChild(pc);div.appendChild(ov);
+    app.appendChild(div);return;
+  }
+
+  // ── FOREST BATTLE SCENE ──
+  const scene=h("div",{style:{position:"relative",height:"200px",flexShrink:"0",overflow:"hidden"}});
+  // Sky/atmosphere
+  scene.appendChild(h("div",{style:{position:"absolute",inset:"0",background:"linear-gradient(180deg,#0a1a05 0%,#061204 40%,#040e03 100%)"}}));
+  // Deep forest BG (SVG)
+  scene.innerHTML+=`<svg style="position:absolute;bottom:30px;left:0;width:100%;height:90px;pointer-events:none" viewBox="0 0 400 90" preserveAspectRatio="none">
+    <polygon points="5,90 22,20 39,90" fill="#0d2008"/>
+    <polygon points="35,90 58,8 81,90" fill="#0a1a05"/>
+    <polygon points="85,90 104,28 123,90" fill="#0d2008"/>
+    <polygon points="120,90 138,40 156,90" fill="#0a1505"/>
+    <polygon points="240,90 262,12 284,90" fill="#0a1a05"/>
+    <polygon points="295,90 318,5 341,90" fill="#0d2008"/>
+    <polygon points="348,90 366,25 384,90" fill="#0a1a05"/>
+    <rect x="0" y="80" width="400" height="10" fill="#061204"/>
+  </svg>`;
+  // Ground dirt path
+  scene.appendChild(h("div",{style:{position:"absolute",bottom:"0",left:"0",right:"0",height:"35px",background:"linear-gradient(0deg,#0a0800 0%,#1a1008 70%,transparent 100%)"}}));
+  // Grass tufts
+  ["4%","16%","32%","50%","66%","80%","93%"].forEach(x=>scene.appendChild(h("div",{style:{position:"absolute",bottom:"28px",left:x,fontSize:"13px",opacity:".45",pointerEvents:"none"}},["🌿"])));
+  // Hanging leaves / vines
+  scene.innerHTML+=`<svg style="position:absolute;top:0;left:0;width:100%;height:40px;pointer-events:none" viewBox="0 0 400 40" preserveAspectRatio="xMidYMin meet">
+    <line x1="30" y1="0" x2="28" y2="35" stroke="#1a3a10" stroke-width="1.5"/>
+    <ellipse cx="28" cy="33" rx="5" ry="3" fill="#1a3a10"/>
+    <line x1="80" y1="0" x2="83" y2="30" stroke="#1a3a10" stroke-width="1.5"/>
+    <ellipse cx="84" cy="28" rx="4" ry="3" fill="#1a3a10"/>
+    <line x1="310" y1="0" x2="308" y2="32" stroke="#1a3a10" stroke-width="1.5"/>
+    <ellipse cx="307" cy="30" rx="5" ry="3" fill="#1a3a10"/>
+    <line x1="360" y1="0" x2="362" y2="28" stroke="#1a3a10" stroke-width="1.5"/>
+    <ellipse cx="363" cy="26" rx="4" ry="3" fill="#1a3a10"/>
+  </svg>`;
+  // Fireflies
+  for(let i=0;i<5;i++){scene.appendChild(h("div",{style:{position:"absolute",left:`${10+Math.random()*80}%`,top:`${10+Math.random()*55}%`,width:"2px",height:"2px",borderRadius:"50%",background:"rgba(200,255,100,.9)",boxShadow:"0 0 5px rgba(180,255,80,.8)",animation:`starTwinkle ${1.2+Math.random()}s ease-in-out ${Math.random()*2}s infinite`,pointerEvents:"none"}}));}
+  // Falling leaves
+  ["20%","45%","70%","88%"].forEach((x,i)=>{scene.appendChild(h("div",{style:{position:"absolute",left:x,top:"2px",fontSize:"9px",opacity:".7",animation:`leafFall ${1.8+i*.5}s linear ${i*.6}s infinite`,pointerEvents:"none"}},["🍂"]));});
+
+  // ── PLAYER STICK FIGURE WITH STAFF ──
+  const pc=el.c;
+  const playerSVG=`<svg width="56" height="78" viewBox="0 0 56 78">
+    <!-- Staff -->
+    <line x1="42" y1="6" x2="36" y2="66" stroke="${pc}" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="42" cy="6" r="5" fill="${pc}" opacity=".95"/>
+    <line x1="38" y1="12" x2="46" y2="18" stroke="${pc}" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="39" y1="9" x2="46" y2="12" stroke="${pc}" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- Head -->
+    <circle cx="18" cy="13" r="8" fill="#C8A060" stroke="${pc}" stroke-width="1.5"/>
+    <!-- Eyes -->
+    <circle cx="15" cy="12" r="1.5" fill="#3a2010"/>
+    <circle cx="21" cy="12" r="1.5" fill="#3a2010"/>
+    <!-- Robe body -->
+    <polygon points="9,46 27,46 31,70 5,70" fill="${mel.bg}" stroke="${pc}" stroke-width="1" opacity=".95"/>
+    <!-- Torso line -->
+    <line x1="18" y1="21" x2="18" y2="46" stroke="#8B6040" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- Arms -->
+    <line x1="18" y1="28" x2="7" y2="38" stroke="#C8A060" stroke-width="3" stroke-linecap="round"/>
+    <line x1="18" y1="28" x2="35" y2="34" stroke="#C8A060" stroke-width="3" stroke-linecap="round"/>
+    <!-- Legs -->
+    <line x1="13" y1="65" x2="9" y2="74" stroke="#7a5030" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="21" y1="65" x2="25" y2="74" stroke="#7a5030" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Feet -->
+    <ellipse cx="9" cy="75" rx="4" ry="2" fill="#5a3820"/>
+    <ellipse cx="25" cy="75" rx="4" ry="2" fill="#5a3820"/>
+  </svg>`;
+  const pWrap=h("div",{style:{position:"absolute",left:"10%",bottom:"28px",display:"flex",flexDirection:"column",alignItems:"center",gap:"3px"}});
+  const pChar=h("div",{style:{filter:`drop-shadow(0 0 8px ${el.g})`,animation:cb.result==="correct"?"staffSwing .5s ease-out":"none"}});
+  pChar.innerHTML=playerSVG;
+  pWrap.appendChild(pChar);
+  pWrap.appendChild(h("div",{style:{fontSize:"9px",color:el.c,fontWeight:"700",textShadow:`0 0 6px ${el.g}`,whiteSpace:"nowrap"}},[p.name]));
+  scene.appendChild(pWrap);
+
+  // ── MONSTER STICK FIGURE WITH FISTS ──
+  const mc=mel.c;
+  const mW=isBoss?70:56;const mH=isBoss?88:72;
+  const monsterSVG=`<svg width="${mW}" height="${mH}" viewBox="0 0 ${mW} ${mH}" style="transform:scaleX(-1)">
+    <!-- Body -->
+    <ellipse cx="${mW/2}" cy="${mH*.18}" rx="${isBoss?13:10}" ry="${isBoss?13:10}" fill="${mc}" opacity=".88"/>
+    ${isBoss?`<polygon points="${mW/2-9},${mH*.08} ${mW/2},${mH*.02} ${mW/2+9},${mH*.08}" fill="${mc}"/>`:``}
+    <!-- Eyes glowing -->
+    <circle cx="${mW/2-4}" cy="${mH*.16}" r="2.5" fill="rgba(255,50,30,1)"/>
+    <circle cx="${mW/2+4}" cy="${mH*.16}" r="2.5" fill="rgba(255,50,30,1)"/>
+    <circle cx="${mW/2-4}" cy="${mH*.16}" r="1" fill="rgba(255,200,200,.9)"/>
+    <circle cx="${mW/2+4}" cy="${mH*.16}" r="1" fill="rgba(255,200,200,.9)"/>
+    <!-- Torso -->
+    <rect x="${mW/2-10}" y="${mH*.3}" width="20" height="${mH*.28}" rx="4" fill="${mc}" opacity=".78"/>
+    <!-- Arms -->
+    <line x1="${mW/2-10}" y1="${mH*.36}" x2="${mW/2-22}" y2="${mH*.46}" stroke="${mc}" stroke-width="4" stroke-linecap="round"/>
+    <line x1="${mW/2+10}" y1="${mH*.36}" x2="${mW/2+22}" y2="${mH*.5}" stroke="${mc}" stroke-width="4" stroke-linecap="round"/>
+    <!-- Fists -->
+    <circle cx="${mW/2-22}" cy="${mH*.47}" r="${isBoss?8:6}" fill="${mc}" stroke="rgba(0,0,0,.4)" stroke-width="1.5"/>
+    <circle cx="${mW/2+22}" cy="${mH*.51}" r="${isBoss?7:5}" fill="${mc}" opacity=".85"/>
+    <!-- Legs -->
+    <line x1="${mW/2-6}" y1="${mH*.58}" x2="${mW/2-9}" y2="${mH*.88}" stroke="${mc}" stroke-width="4" stroke-linecap="round"/>
+    <line x1="${mW/2+6}" y1="${mH*.58}" x2="${mW/2+9}" y2="${mH*.88}" stroke="${mc}" stroke-width="4" stroke-linecap="round"/>
+    <!-- Feet -->
+    <ellipse cx="${mW/2-9}" cy="${mH*.9}" rx="6" ry="3" fill="${mc}" opacity=".7"/>
+    <ellipse cx="${mW/2+9}" cy="${mH*.9}" rx="6" ry="3" fill="${mc}" opacity=".7"/>
+  </svg>`;
+  const mWrap=h("div",{style:{position:"absolute",right:"8%",bottom:"26px",display:"flex",flexDirection:"column",alignItems:"center",gap:"3px"}});
+  const mChar=h("div",{style:{filter:`drop-shadow(0 0 10px ${mel.g})`,animation:cb.monsterTurn?"fistPunch .35s ease-in-out":cb.result==="wrong"?"shake .4s ease-out":"monsterBob 2s ease-in-out infinite"}});
+  mChar.innerHTML=monsterSVG;
+  mWrap.appendChild(mChar);
+  mWrap.appendChild(h("div",{style:{fontSize:"9px",color:mel.c,fontWeight:"700",textShadow:`0 0 6px ${mel.g}`,whiteSpace:"nowrap"}},[m.n]));
+  scene.appendChild(mWrap);
+
+  // Floating damage
+  if(cb.dmgText){
+    const dmgEl=h("div",{style:{position:"absolute",left:cb.dmgSide==="monster"?"56%":"14%",top:"16px",fontSize:"24px",fontWeight:"900",color:cb.dmgSide==="monster"?"#FF2222":"#FF6B35",animation:"dmgFloat 1.2s ease-out forwards",pointerEvents:"none",textShadow:"0 0 12px currentColor"}},[cb.dmgText]);
+    scene.appendChild(dmgEl);
+  }
+
+  // Top: boss label + pause
+  const topBar=h("div",{style:{position:"absolute",top:"6px",left:"0",right:"0",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0 12px",zIndex:"10"}});
+  topBar.appendChild(isBoss?h("div",{style:{fontSize:"12px",color:"#FFD700",letterSpacing:"2px",animation:"pulse 2s infinite",textShadow:"0 0 8px #FFD700"}},["⚠️ BOSS BATTLE ⚠️"]):h("span",{}));
+  const pauseBtn=h("button",{style:{padding:"5px 12px",borderRadius:"8px",background:"rgba(0,0,0,.7)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",cursor:"pointer",fontSize:"13px",fontWeight:"700"}},["⏸"]);
+  pauseBtn.addEventListener("click",()=>{cb.paused=true;render();});
+  topBar.appendChild(pauseBtn);
+  scene.appendChild(topBar);
+  div.appendChild(scene);
+
+  // HP bars
+  const hpRow=h("div",{style:{padding:"8px 14px",background:"rgba(0,0,0,.8)",borderBottom:"1px solid rgba(255,255,255,.06)",display:"flex",gap:"14px",flexShrink:"0"}});
+  hpRow.appendChild(h("div",{style:{flex:"1"}},[hbar(p.name,cb.playerHp,p.maxEnergy,el.c,el.g)]));
+  hpRow.appendChild(h("div",{style:{flex:"1"}},[hbar(m.n,m.curHp,m.hp,mel.c,mel.g)]));
+  div.appendChild(hpRow);
+
+  // Monster turn indicator
+  if(cb.monsterTurn){
+    div.appendChild(h("div",{style:{padding:"6px 14px",background:"rgba(200,50,50,.18)",borderBottom:"1px solid rgba(200,50,50,.35)",textAlign:"center",fontSize:"12px",color:"#FF8080",animation:"pulse 1s infinite"}},["⚔️ "+m.n+" attacks!"]));
+  }
+
+  // Question panel
+  const qWrap=h("div",{style:{flex:"1",overflowY:"auto",padding:"12px 14px"}});
+  if(cb.streak>1){
+    const sm=G.player.path==="rogue"?2:1;
+    qWrap.appendChild(h("div",{style:{textAlign:"center",color:"#FFD700",fontSize:"12px",marginBottom:"6px",animation:"pulse 1s ease-in-out infinite"}},["🔥 "+cb.streak+"x Streak! Bonus damage +"+(cb.streak*3*sm)]));
+  }
+  const qCard=h("div",{style:{background:"rgba(12,6,2,.94)",borderRadius:"14px",padding:"16px",border:"1px solid rgba(255,200,100,.22)",boxShadow:"0 0 18px rgba(255,140,0,.08)"}});
+  qCard.appendChild(h("div",{style:{color:"#C0A060",fontSize:"11px",letterSpacing:"2px",marginBottom:"8px",textAlign:"center"}},["⚔️ ANSWER TO ATTACK — Turn "+(cb.turn+1)+" · Level "+G.level]));
+  qCard.appendChild(h("div",{style:{fontSize:"19px",fontWeight:"700",color:"#FFE4B5",textAlign:"center",marginBottom:"14px",fontFamily:"'Courier New',monospace",letterSpacing:"1px",lineHeight:"1.4"}},[cb.question.q]));
+  // 2×2 choice grid
+  const cg=h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"10px"}});
+  cb.question.ch.forEach((c,i)=>{
+    const isCorrect=c===cb.question.a;
+    const isSel=cb.selected===i;
+    let bg="rgba(255,255,255,.06)",border="rgba(255,255,255,.15)",clr="#FFE4B5";
+    if(cb.result&&isSel&&cb.result==="correct"){bg="rgba(50,180,50,.3)";border="#32CD32";clr="#90EE90";}
+    else if(cb.result&&isSel&&cb.result==="wrong"){bg="rgba(200,50,50,.3)";border="#DC143C";clr="#FF8080";}
+    else if(cb.result&&isCorrect){bg="rgba(50,180,50,.16)";border="#32CD3266";clr="#90EE90";}
+    const btn=h("button",{style:{padding:"13px 8px",borderRadius:"10px",background:bg,border:`2px solid ${border}`,color:clr,cursor:cb.result||cb.monsterTurn?"default":"pointer",fontSize:"14px",fontWeight:"700",fontFamily:"monospace",transition:"all .15s",lineHeight:"1.3"}},[["A","B","C","D"][i]+". "+c]);
+    if(!cb.result&&!cb.monsterTurn){btn.addEventListener("mouseover",()=>{btn.style.background="rgba(255,255,255,.12)";});btn.addEventListener("mouseout",()=>{btn.style.background="rgba(255,255,255,.06)";});}
+    btn.addEventListener("click",()=>{if(!cb.result&&!cb.monsterTurn)handleAnswer(i,c);});
+    cg.appendChild(btn);
+  });
+  qCard.appendChild(cg);
+  const freeHint=G.player.path==="mage";
+  if(!cb.showHint){
+    const hb=h("button",{style:{width:"100%",padding:"8px",borderRadius:"8px",background:"rgba(255,200,50,.07)",border:"1px solid rgba(255,200,50,.22)",color:"#C0A060",cursor:"pointer",fontSize:"12px",fontStyle:"italic"}},[freeHint?"💡 Hint (Free — Mage path)":"💡 Reveal Hint (−2 energy)"]);
+    hb.addEventListener("click",()=>{if(!freeHint){G.player.energy=Math.max(0,G.player.energy-2);cb.playerHp=Math.max(0,cb.playerHp-2);}cb.showHint=true;SFX.click();render();});
+    qCard.appendChild(hb);
+  }else{
+    qCard.appendChild(h("div",{style:{padding:"8px 12px",borderRadius:"8px",background:"rgba(255,200,50,.1)",border:"1px solid rgba(255,200,50,.3)",color:"#FFD060",fontSize:"13px",textAlign:"center",fontStyle:"italic"}},["💡 "+cb.question.h]));
+  }
+  qWrap.appendChild(qCard);div.appendChild(qWrap);app.appendChild(div);
+  // Inject keyframes once
+  if(!document.getElementById("mte-kf")){
+    const st=document.createElement("style");st.id="mte-kf";
+    st.textContent="@keyframes monsterBob{0%,100%{transform:scaleX(-1) translateY(0)}50%{transform:scaleX(-1) translateY(-6px)}}@keyframes fistPunch{0%,100%{transform:scaleX(-1) translateX(0)}50%{transform:scaleX(-1) translateX(-14px)}}@keyframes staffSwing{0%,100%{transform:rotate(-20deg)}50%{transform:rotate(20deg)}}@keyframes leafFall{0%{transform:translateY(-5px) rotate(0deg);opacity:.8}100%{transform:translateY(70px) rotate(200deg);opacity:0}}";
+    document.head.appendChild(st);
+  }
+}
+
+function handleAnswer(idx,choice){
+  const cb=G.combat;const p=G.player;
+  const correct=choice===cb.question.a;
+  cb.selected=idx;
+  if(correct){
+    SFX.correct();SFX.staff();
+    const pathBonus=p.path==="warrior"?5:0;
+    const sm=p.path==="rogue"?2:1;
+    const dmg=15+cb.streak*3*sm+pathBonus;
+    cb.monster.curHp=Math.max(0,cb.monster.curHp-dmg);
+    cb.result="correct";cb.streak++;
+    cb.dmgText="-"+dmg;cb.dmgSide="monster";
+    if(p.path==="healer"){G.player.energy=Math.min(p.maxEnergy,p.energy+2);cb.playerHp=Math.min(p.maxEnergy,cb.playerHp+2);}
+    render();
+    if(cb.monster.curHp<=0){
+      SFX.victory();
+      setTimeout(()=>{G.player.gold+=cb.monster.xp;G.player.energy=cb.playerHp;G.monstersKilled++;G.result={won:true,xp:cb.monster.xp};G.screen="result";G.combat=null;save();render();},1300);
+    }else{setTimeout(()=>nextTurn(),1400);}
+  }else{
+    // Wrong answer → monster attacks
+    SFX.wrong();
+    cb.result="wrong";cb.streak=0;
+    cb.dmgText=null;cb.dmgSide=null;
+    render();
+    setTimeout(()=>{
+      cb.monsterTurn=true;
+      const dmg=rand(cb.monster.atkMin||5,cb.monster.atkMax||15);
+      cb.playerHp=Math.max(0,cb.playerHp-dmg);
+      cb.dmgText="-"+dmg;cb.dmgSide="player";
+      SFX.monster();
+      render();
+      if(cb.playerHp<=0){
+        SFX.defeat();
+        setTimeout(()=>{G.player.energy=0;G.result={won:false,xp:0};G.screen="result";G.combat=null;save();render();},1500);
+      }else{setTimeout(()=>nextTurn(),1600);}
+    },850);
+  }
+}
+
+function nextTurn(){
+  const cb=G.combat;if(!cb)return;
+  cb.result=null;cb.selected=null;cb.showHint=false;cb.dmgText=null;cb.dmgSide=null;cb.monsterTurn=false;
+  cb.turn++;cb.question=getQ(G.player.grade,G.level);
+  G.player.energy=cb.playerHp;
+  render();
+}
+
+// ═══════════════════════════════════
+// VILLAGE — Painted BG + Guardian
+// ═══════════════════════════════════
+function renderVillage(){
+  const p=G.player;const v=G.activeVillage;const vel=getEl(v.el);
+  const div=h("div",{style:{position:"absolute",inset:"0",display:"flex",flexDirection:"column",background:`radial-gradient(ellipse,${vel.bg} 0%,#050300 100%)`,overflowY:"auto"}});
+
+  // ── Village painted backdrop ──
+  const vbg=h("div",{style:{position:"relative",width:"100%",height:"170px",overflow:"hidden",flexShrink:"0"}});
+  const elPal={
+    fire: {sky:"#2a0d00",ground:"#1a0800",hut:"#8B3510",roof:"#5a2008",detail:"#FF4500"},
+    water:{sky:"#001830",ground:"#001525",hut:"#1a4a6a",roof:"#0d2a40",detail:"#00BFFF"},
+    electric:{sky:"#1a1800",ground:"#141000",hut:"#4a3a08",roof:"#2a2000",detail:"#FFD700"},
+    earth:{sky:"#051a05",ground:"#0a1a05",hut:"#2a4a10",roof:"#1a3008",detail:"#228B22"}
+  }[v.el];
+  vbg.appendChild(h("div",{style:{position:"absolute",inset:"0",background:`linear-gradient(180deg,${elPal.sky} 0%,${elPal.sky}dd 50%,${elPal.ground} 100%)`}}));
+  vbg.innerHTML+=`<svg style="position:absolute;bottom:0;left:0;width:100%;height:140px;pointer-events:none" viewBox="0 0 400 140" preserveAspectRatio="none">
+    <!-- Ground -->
+    <rect x="0" y="100" width="400" height="40" fill="${elPal.ground}"/>
+    <rect x="0" y="98" width="400" height="5" fill="${elPal.detail}" opacity=".15"/>
+    <!-- Hut 1 (left) -->
+    <rect x="22" y="65" width="65" height="40" rx="2" fill="${elPal.hut}"/>
+    <polygon points="10,67 98,67 54,32" fill="${elPal.roof}"/>
+    <line x1="10" y1="67" x2="98" y2="67" stroke="${elPal.detail}" stroke-width="1.5" opacity=".6"/>
+    <rect x="43" y="82" width="18" height="23" rx="1" fill="rgba(0,0,0,.65)"/>
+    <rect x="66" y="73" width="12" height="10" rx="1" fill="${elPal.detail}" opacity=".25"/>
+    <!-- Hut 2 (center big) -->
+    <rect x="155" y="52" width="90" height="52" rx="2" fill="${elPal.hut}"/>
+    <polygon points="140,54 260,54 200,14" fill="${elPal.roof}"/>
+    <line x1="140" y1="54" x2="260" y2="54" stroke="${elPal.detail}" stroke-width="2" opacity=".5"/>
+    <rect x="187" y="72" width="22" height="32" rx="1" fill="rgba(0,0,0,.65)"/>
+    <rect x="218" y="62" width="14" height="12" rx="1" fill="${elPal.detail}" opacity=".25"/>
+    <!-- Hut 3 (right) -->
+    <rect x="305" y="68" width="58" height="37" rx="2" fill="${elPal.hut}"/>
+    <polygon points="294,70 374,70 334,38" fill="${elPal.roof}"/>
+    <rect x="320" y="82" width="15" height="23" rx="1" fill="rgba(0,0,0,.65)"/>
+    <!-- Trees -->
+    <polygon points="118,100 133,55 148,100" fill="#1a3a10" opacity=".85"/>
+    <polygon points="116,100 133,60 150,100" fill="#0d2008" opacity=".5"/>
+    <polygon points="263,100 278,48 293,100" fill="#1a3a10" opacity=".85"/>
+    <!-- Wooden cart -->
+    <rect x="80" y="86" width="40" height="16" rx="2" fill="#5a3810"/>
+    <line x1="80" y1="94" x2="120" y2="94" stroke="#3a2008" stroke-width="1"/>
+    <circle cx="88" cy="103" r="6" fill="#3a2008" stroke="#8B6040" stroke-width="1.5"/>
+    <circle cx="112" cy="103" r="6" fill="#3a2008" stroke="#8B6040" stroke-width="1.5"/>
+    <rect x="84" y="86" width="30" height="8" rx="1" fill="#6a4820"/>
+    <!-- Berry bush -->
+    <ellipse cx="150" cy="92" rx="14" ry="9" fill="#1a4010"/>
+    <circle cx="144" cy="89" r="3.5" fill="#8B0000" opacity=".9"/>
+    <circle cx="151" cy="87" r="3" fill="#8B0000"/>
+    <circle cx="158" cy="90" r="2.5" fill="#6B0000"/>
+    <circle cx="147" cy="93" r="2" fill="#9B1010"/>
+    <!-- Smoke from chimney -->
+    <circle cx="54" cy="28" r="4" fill="rgba(150,120,80,.25)"/>
+    <circle cx="57" cy="20" r="5" fill="rgba(150,120,80,.2)"/>
+    <circle cx="200" cy="10" r="5" fill="rgba(150,120,80,.2)"/>
+    <circle cx="203" cy="2" r="4" fill="rgba(150,120,80,.15)"/>
+  </svg>`;
+  // Village name overlay
+  const vt=h("div",{style:{position:"absolute",top:"8px",left:"0",right:"0",textAlign:"center"}});
+  vt.innerHTML=`<div style="font-size:20px;font-weight:900;color:${vel.c};text-shadow:0 0 12px ${vel.g}">${vel.icon} ${v.n}</div><div style="font-size:11px;color:${vel.c};opacity:.8">${vel.name} Village</div>`;
+  vbg.appendChild(vt);
+  div.appendChild(vbg);
+
+  // ── Guardian NPC ──
+  const gw=h("div",{style:{display:"flex",alignItems:"center",gap:"14px",padding:"12px 16px",background:`linear-gradient(90deg,${vel.c}22,transparent)`,borderBottom:`1px solid ${vel.c}33`,flexShrink:"0"}});
+  const gi=h("div",{style:{fontSize:"42px",animation:"guardianFloat 3s ease-in-out infinite",filter:`drop-shadow(0 0 10px ${vel.g})`}},[v.guardian]);
+  const ginfo=h("div",{});
+  ginfo.appendChild(h("div",{style:{fontWeight:"700",fontSize:"14px",color:vel.c}},[v.guardianName]));
+  ginfo.appendChild(h("div",{style:{fontSize:"11px",color:"#888",fontStyle:"italic"}},[vel.name+" Village Guardian"]));
+  ginfo.appendChild(h("div",{style:{fontSize:"11px",color:"#C0A060",marginTop:"3px",fontStyle:"italic"}},["\""+v.desc.split('.')[0]+'."']));
+  gw.appendChild(gi);gw.appendChild(ginfo);div.appendChild(gw);
+
+  const content=h("div",{style:{padding:"14px 16px",maxWidth:"420px",width:"100%",margin:"0 auto"}});
+  const canEnter=p.element===v.el||p.disguises.some(d=>d.includes(v.el));
+  if(!canEnter)content.appendChild(h("div",{style:{padding:"8px 12px",borderRadius:"8px",marginBottom:"10px",background:"rgba(200,50,50,.18)",border:"1px solid rgba(200,50,50,.35)",color:"#FF8080",fontSize:"12px",fontStyle:"italic",textAlign:"center"}},["⚠️ You need a "+vel.name+" disguise to enter freely!"]));
+
+  // Market
+  const mkt=h("div",{class:"card",style:{border:`1px solid ${vel.c}22`,marginBottom:"10px"}});
+  mkt.appendChild(h("div",{style:{color:vel.c,fontSize:"13px",fontWeight:"700",marginBottom:"10px"}},["🍞 Village Market · 💰 Gold: "+p.gold]));
+  v.food.forEach(fid=>{
+    const food=FOODS.find(f=>f.id===fid);if(!food)return;
+    const canBuy=p.gold>=food.cost;
+    const btn=h("button",{style:{display:"flex",alignItems:"center",gap:"10px",width:"100%",padding:"10px 12px",borderRadius:"10px",background:canBuy?"rgba(255,255,255,.06)":"rgba(255,255,255,.02)",border:`1px solid ${canBuy?vel.c+"44":"rgba(255,255,255,.07)"}`,color:canBuy?"#FFE4B5":"#444",cursor:canBuy?"pointer":"not-allowed",marginBottom:"7px",transition:"all .2s"}},[
+      h("span",{style:{fontSize:"22px"}},[food.s]),
+      h("div",{style:{flex:"1",textAlign:"left"}},[h("div",{style:{fontSize:"12px",fontWeight:"700"}},[food.n+(food.rare?" ⭐ RARE":"")]),h("div",{style:{fontSize:"10px",color:food.rare?"#FFD700":"#888",fontStyle:"italic"}},[food.desc])]),
+      h("div",{style:{textAlign:"right"}},[h("div",{style:{fontSize:"12px",color:"#90EE90"}},["+"+food.hp+" ⚡"]),h("div",{style:{fontSize:"11px",color:"#FFD700"}},[food.cost+"g"])])
+    ]);
+    btn.addEventListener("click",()=>{if(!canBuy)return;G.player.gold-=food.cost;G.player.energy=Math.min(p.maxEnergy,G.player.energy+food.hp);SFX.click();save();renderVillage();});
+    mkt.appendChild(btn);
+  });
+  content.appendChild(mkt);
+
+  // Disguise pickup
+  if(v.disguise&&!p.disguises.includes(v.disguise)){
+    const d=DISGUISES.find(x=>x.id===v.disguise);
+    if(d){
+      const btn=h("button",{style:{width:"100%",padding:"12px",borderRadius:"12px",marginBottom:"10px",background:"rgba(255,215,0,.1)",border:"1px solid rgba(255,215,0,.35)",color:"#FFD700",cursor:"pointer",fontWeight:"700",fontSize:"13px",animation:"pulse 2s infinite"}},["✨ Found: "+d.s+" "+d.n+" — Pick up?"]);
+      btn.addEventListener("click",()=>{G.player.disguises.push(v.disguise);SFX.correct();save();renderVillage();});
+      content.appendChild(btn);
+    }
+  }
+  const leaveBtn=h("button",{style:{width:"100%",padding:"13px",borderRadius:"12px",background:`linear-gradient(135deg,${vel.c},${vel.g})`,border:"none",color:"#000",cursor:"pointer",fontWeight:"700",fontSize:"15px",boxShadow:`0 0 14px ${vel.g}44`}},["← Leave Village"]);
+  leaveBtn.addEventListener("click",()=>{G.screen="main";G.activeVillage=null;SFX.click();advanceOrBranch();});
+  content.appendChild(leaveBtn);
+  div.appendChild(content);app.appendChild(div);
+}
+
+// ═══════════════════════════════════
+// RESULT SCREEN
+// ═══════════════════════════════════
+function renderResult(){
+  const res=G.result;const p=G.player;const el=getEl(p.element);
+  const div=h("div",{style:{position:"absolute",inset:"0",background:`radial-gradient(ellipse,${res.won?"#001800":"#180000"} 0%,#030202 100%)`,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}});
+  const card=h("div",{class:"card",style:{border:`1px solid ${res.won?"#32CD3266":"#DC143C55"}`,maxWidth:"320px",width:"100%",textAlign:"center",boxShadow:`0 0 40px ${res.won?"rgba(50,200,50,.2)":"rgba(200,50,50,.2)"}`,animation:"slideUp .3s ease-out"}});
+  card.appendChild(h("div",{style:{fontSize:"60px",marginBottom:"8px",animation:"pulse 1.5s infinite"}},[res.treasure?"💎":res.won?"🏆":"💀"]));
+  card.appendChild(h("div",{style:{fontSize:"22px",fontWeight:"700",color:res.treasure?"#FFD700":res.won?"#32CD32":"#DC143C",marginBottom:"8px"}},[res.treasure?"Treasure Found!":res.won?"Victory!":"Defeated!"]));
+  card.appendChild(h("div",{style:{color:"#C0A060",fontSize:"13px",marginBottom:"16px",fontStyle:"italic"}},[res.treasure?"35 gold discovered in ancient ruins!":res.won?"The monster falls! Your mathematical power grows!":"You were overpowered. Rest and return stronger."]));
+  if((res.won||res.treasure)&&res.xp>0)card.appendChild(h("div",{style:{padding:"10px",borderRadius:"10px",marginBottom:"14px",background:"rgba(255,215,0,.1)",border:"1px solid rgba(255,215,0,.25)"}},[h("span",{style:{color:"#FFD700",fontSize:"18px",fontWeight:"700"}},["+" +res.xp+" 💰 Gold Earned"])]));
+  if(!res.won&&!res.treasure&&p.energy<=5)card.appendChild(h("div",{style:{padding:"8px 12px",borderRadius:"8px",marginBottom:"12px",background:"rgba(255,100,0,.15)",border:"1px solid rgba(255,100,0,.3)",color:"#FF8040",fontSize:"12px"}},["⚠️ Low energy! Find a village to buy food!"]));
+  const cb=h("button",{style:{width:"100%",padding:"13px",borderRadius:"12px",background:`linear-gradient(135deg,${el.c},${el.g})`,border:"none",color:"#000",cursor:"pointer",fontWeight:"700",fontSize:"15px",boxShadow:`0 0 14px ${el.g}55`}},["Continue →"]);
+  cb.addEventListener("click",()=>{
+    G.result=null;
+    if(G.monstersKilled>0&&G.monstersKilled%5===0)G.adPending=true;
+    if(G.adPending){G.adPending=false;G.screen="ad";render();}
+    else if(res.won||res.treasure){advanceOrBranch();}
+    else{G.screen="main";SFX.explore();render();}
+  });
+  card.appendChild(cb);div.appendChild(card);app.appendChild(div);
+}
+
+// ═══════════════════════════════════
+// BOSS VICTORY
+// ═══════════════════════════════════
+function renderBossVictory(){
+  SFX.victory();
+  const p=G.player;const el=getEl(p.element);
+  const div=h("div",{style:{position:"absolute",inset:"0",background:"radial-gradient(ellipse at center,#0a0500 0%,#030200 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px",textAlign:"center",overflowY:"auto"}});
+  for(let i=0;i<22;i++){div.appendChild(h("div",{style:{position:"absolute",left:`${Math.random()*90}%`,top:`${Math.random()*60}%`,fontSize:`${10+Math.random()*14}px`,animation:`floatUp ${2+Math.random()*3}s ease-in-out ${Math.random()*2}s infinite`,opacity:".8",pointerEvents:"none"}},["✨"]));}
+  div.appendChild(h("div",{style:{fontSize:"64px",marginBottom:"12px",animation:"pulse 1.5s infinite",position:"relative",zIndex:"1"}},["🏆"]));
+  div.appendChild(h("div",{style:{fontSize:"26px",fontWeight:"900",color:"#FFD700",marginBottom:"6px",textShadow:"0 0 20px #FFD700",position:"relative",zIndex:"1"}},["STAGE "+G.stage+" COMPLETE!"]));
+  div.appendChild(h("div",{style:{fontSize:"15px",color:"#C0A060",marginBottom:"8px",fontStyle:"italic",position:"relative",zIndex:"1"}},["The Storm Drake is defeated!"]));
+  div.appendChild(h("div",{style:{color:"#D4C4A0",fontSize:"13px",lineHeight:"1.8",marginBottom:"20px",maxWidth:"300px",position:"relative",zIndex:"1"}},["You have conquered the realm of Arithmia! The storm clears and a new world emerges beyond the horizon. Your legend grows..."]));
+  // Stage stats
+  const stats=h("div",{style:{background:"rgba(255,215,0,.08)",border:"1px solid rgba(255,215,0,.25)",borderRadius:"12px",padding:"16px 22px",marginBottom:"22px",width:"100%",maxWidth:"280px",position:"relative",zIndex:"1"}});
+  stats.appendChild(h("div",{style:{color:"#FFD700",fontSize:"12px",letterSpacing:"2px",marginBottom:"10px",textAlign:"center"}},["✦ STAGE "+G.stage+" RESULTS ✦"]));
+  [["Monsters Defeated",G.monstersKilled,"#90EE90"],["Gold Collected",p.gold,"#FFD700"],["Energy Remaining",p.energy+"/"+p.maxEnergy,p.energy>8?"#90EE90":"#FF6B35"],["Stage Completed","Stage "+G.stage,"#C080FF"]].forEach(([l,v,c])=>{
+    stats.appendChild(h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:"13px",color:"#C0A060",marginBottom:"4px"}},[h("span",{},[l+":"]),h("span",{style:{color:c,fontWeight:"700"}},[String(v)])]));
+  });
+  div.appendChild(stats);
+  const nb=h("button",{style:{padding:"15px 36px",borderRadius:"12px",background:`linear-gradient(135deg,${el.c},${el.g})`,border:"none",color:"#000",cursor:"pointer",fontWeight:"700",fontSize:"16px",boxShadow:`0 0 22px ${el.g}77`,marginBottom:"12px",position:"relative",zIndex:"1"}},["⚔️ Begin Stage "+(G.stage+1)]);
+  nb.addEventListener("click",()=>{
+    G.stage++;G.level=1;G.path=[0];G.currentNodeId=0;initQUsed();
+    G.screen="main";SFX.explore();save();render();
+  });
+  const mb=h("button",{style:{padding:"11px 26px",borderRadius:"10px",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.18)",color:"#aaa",cursor:"pointer",fontSize:"13px",position:"relative",zIndex:"1"}},["🏠 Main Menu"]);
+  mb.addEventListener("click",()=>{CC={step:0,name:"",gender:null,element:null,path:null,grade:null};G.screen="create";render();});
+  div.appendChild(nb);div.appendChild(mb);app.appendChild(div);
+}
+
+// ═══════════════════════════════════
+// AD SCREEN
+// ═══════════════════════════════════
+function renderAd(){
+  SFX.stopAll();
+  let cd=5;
+  const div=h("div",{style:{position:"absolute",inset:"0",background:"#000",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:"200"}});
+  div.appendChild(h("div",{style:{position:"absolute",top:"12px",right:"14px",color:"#444",fontSize:"11px",letterSpacing:"1px"}},["ADVERTISEMENT"]));
+  const ab=h("div",{style:{width:"90%",maxWidth:"360px",background:"linear-gradient(135deg,#0a0030,#002044)",borderRadius:"18px",display:"flex",flexDirection:"column",alignItems:"center",gap:"14px",padding:"48px 28px",border:"2px solid rgba(100,150,255,.2)",minHeight:"320px"}});
+  ab.appendChild(h("div",{style:{fontSize:"52px"}},["🏰"]));
+  ab.appendChild(h("div",{style:{fontSize:"22px",color:"#FFD700",fontWeight:"700",textAlign:"center"}},["Epic Quest Awaits!"]));
+  ab.appendChild(h("div",{style:{fontSize:"13px",color:"#aaa",textAlign:"center",lineHeight:"1.6"}},["Expand your adventure across new realms. More stages, more monsters, more math mastery!"]));
+  ab.appendChild(h("div",{style:{padding:"12px 28px",borderRadius:"24px",background:"linear-gradient(135deg,#FF6B35,#FFD700)",color:"#000",fontWeight:"700",fontSize:"15px"}},["Play Now →"]));
+  div.appendChild(ab);
+  const sw=h("div",{style:{marginTop:"20px",minHeight:"40px",display:"flex",alignItems:"center",justifyContent:"center"}});
+  const sl=h("div",{style:{color:"#444",fontSize:"13px"}},["Skip in 5s..."]);
+  sw.appendChild(sl);div.appendChild(sw);app.appendChild(div);
+  const iv=setInterval(()=>{
+    cd--;
+    if(cd<=0){
+      clearInterval(iv);sw.innerHTML="";
+      const sb=h("button",{style:{padding:"11px 30px",borderRadius:"8px",background:"rgba(255,255,255,.12)",border:"1px solid rgba(255,255,255,.25)",color:"#fff",cursor:"pointer",fontSize:"14px"}},["✕ Close Ad"]);
+      sb.addEventListener("click",()=>{G.screen="main";SFX.explore();advanceOrBranch();});
+      sw.appendChild(sb);
+    }else{sl.textContent="Skip in "+cd+"s...";}
+  },1000);
+}
+
+// ═══════════════════════════════════
+// INVENTORY
+// ═══════════════════════════════════
+function renderInventory(){
+  const p=G.player;const el=getEl(p.element);
+  const ov=h("div",{style:{position:"absolute",inset:"0",background:"rgba(0,0,0,.88)",backdropFilter:"blur(6px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:"90",padding:"16px"}});
+  const card=h("div",{class:"card",style:{border:`1px solid ${el.c}55`,maxWidth:"380px",width:"100%",maxHeight:"85vh",overflowY:"auto"}});
+  const hd=h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}});
+  hd.appendChild(h("div",{style:{fontSize:"17px",fontWeight:"700",color:el.c}},["🎒 Inventory & Stats"]));
+  const cb=h("button",{style:{padding:"4px 10px",borderRadius:"6px",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.15)",color:"#aaa",cursor:"pointer",fontSize:"13px"}},["✕"]);
+  cb.addEventListener("click",()=>{G.showInventory=false;SFX.click();render();});
+  hd.appendChild(cb);card.appendChild(hd);
+  const pd=PATHS[p.path];
+  card.appendChild(h("div",{style:{padding:"10px 12px",borderRadius:"10px",background:`${el.c}18`,border:`1px solid ${el.c}33`,marginBottom:"12px"}},[h("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},[h("span",{style:{fontSize:"22px"}},[pd?.icon||"⚔️"]),h("div",{},[h("div",{style:{fontWeight:"700",fontSize:"13px",color:el.c}},[pd?.label+" Path"]),h("div",{style:{fontSize:"11px",color:"#888"}},[pd?.bonus])])])]));
+  card.appendChild(h("div",{style:{color:"#C0A060",fontSize:"12px",marginBottom:"8px"}},["🎭 Disguises ("+p.disguises.length+")"]));
+  if(p.disguises.length>0){p.disguises.forEach(did=>{const d=DISGUISES.find(x=>x.id===did);if(d)card.appendChild(h("div",{style:{display:"flex",alignItems:"center",gap:"8px",padding:"7px 10px",borderRadius:"8px",background:"rgba(255,215,0,.06)",border:"1px solid rgba(255,215,0,.14)",marginBottom:"5px"}},[h("span",{style:{fontSize:"20px"}},[d.s]),h("div",{},[h("div",{style:{fontSize:"12px",color:"#FFE4B5"}},[d.n]),h("div",{style:{fontSize:"10px",color:"#888"}},["Entry to "+EL[d.el].name+" villages"])])]));});}
+  else card.appendChild(h("div",{style:{color:"#444",fontSize:"11px",fontStyle:"italic",marginBottom:"8px"}},["No disguises found yet"]));
+  card.appendChild(h("div",{style:{padding:"10px 12px",borderRadius:"10px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",marginTop:"8px"}},[
+    h("div",{style:{color:"#aaa",fontSize:"11px",marginBottom:"6px"}},["📊 Adventure Stats"]),
+    ...[["Stage",G.stage,"#C080FF"],["Level",G.level,el.c],["Monsters Defeated",G.monstersKilled,"#90EE90"],["Gold",p.gold,"#FFD700"],["Energy",`${p.energy}/${p.maxEnergy}`,p.energy>8?"#90EE90":"#FF6B35"],["Grade","Grade "+p.grade,"#C0A060"]].map(([l,v,c])=>h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:"12px",color:"#888",marginBottom:"3px"}},[h("span",{},[l+":"]),h("span",{style:{color:c}},[String(v)])]))
+  ]));
+  ov.appendChild(card);app.appendChild(ov);
+}
+
+// ═══════════════════════════════════
+// BOOT
+// ═══════════════════════════════════
+render();
+</script>
+</body>
+</html>
