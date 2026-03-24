@@ -1,0 +1,8 @@
+# robots.txt for rockywong.com
+# Allow all search engine crawlers
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://rockywong.com/sitemap.xml
