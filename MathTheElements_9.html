@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Math: The Elements — Rev 9</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{height:100%;width:100%;overflow:hidden;background:#050300}
+body{font-family:'Palatino Linotype','Book Antiqua',Palatino,serif;color:#FFE4B5}
+#app{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.game-root{position:relative;width:100%;height:100%;overflow:hidden;max-width:480px;max-height:900px;box-shadow:0 0 60px rgba(0,0,0,.8)}
+button{font-family:inherit;cursor:pointer;border:none;outline:none}
+input{font-family:inherit;outline:none;border:none}
+@keyframes floatUp{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes dmgFloat{0%{opacity:1;transform:translateY(0) scale(1.3)}100%{opacity:0;transform:translateY(-55px) scale(0.8)}}
+@keyframes starTwinkle{0%,100%{opacity:.2}50%{opacity:.9}}
+@keyframes titleGlow{0%,100%{filter:drop-shadow(0 0 10px #FF8C00)}50%{filter:drop-shadow(0 0 28px #FFD700)}}
+@keyframes guardianFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes monsterBob{0%,100%{transform:scaleX(-1) translateY(0)}50%{transform:scaleX(-1) translateY(-5px)}}
+@keyframes orbPulse{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.12);opacity:1}}
+@keyframes orbSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes victoryBurst{0%{transform:scale(0);opacity:1}100%{transform:scale(3);opacity:0}}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes slideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+.hbar-track{background:rgba(0,0,0,.6);border-radius:6px;height:12px;border:1px solid rgba(255,255,255,.15);overflow:hidden;position:relative}
+.hbar-fill{height:100%;border-radius:6px;transition:width .4s ease}
+.hbar-txt{position:absolute;right:5px;top:0;font-size:9px;line-height:12px;color:rgba(255,255,255,.8);font-family:monospace}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:rgba(255,200,100,.3)}
+.elem-orb{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;animation:orbPulse 2.5s ease-in-out infinite;position:relative;flex-shrink:0}
+.elem-orb::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px dashed currentColor;opacity:0.4;animation:orbSpin 5s linear infinite}
+.e-fire{color:#FF6B35;background:radial-gradient(circle,#3a1200,#1a0800)}
+.e-water{color:#4FC3F7;background:radial-gradient(circle,#001a3a,#000d1a)}
+.e-earth{color:#81C784;background:radial-gradient(circle,#0d2a0d,#071407)}
+.e-storm{color:#FFD54F;background:radial-gradient(circle,#2a2000,#1a1400)}
+.e-ice{color:#B3E5FC;background:radial-gradient(circle,#001a2a,#000d1a)}
+.e-shadow{color:#CE93D8;background:radial-gradient(circle,#1a0028,#0d0014)}
+/* Music toggle button */
+#musicBtn{position:fixed;bottom:12px;right:12px;z-index:999;background:rgba(0,0,0,0.6);border:1px solid rgba(255,215,0,0.3);border-radius:50%;width:38px;height:38px;font-size:16px;color:#FFD700;cursor:pointer;display:flex;align-items:center;justify-content:center}
+</style>
+</head>
+<body>
+<div id="app"><div class="game-root" id="gr"></div></div>
+<button id="musicBtn" title="Toggle Music">🔊</button>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// MATH: THE ELEMENTS — REV 9
+// ═══════════════════════════════════════════════════════════
+
+// ── MUSIC ENGINE (Web Audio API – no external files needed) ──
+const MusicEngine = (function(){
+  let ctx, masterGain, playing=false, notes=[], noteIdx=0, interval=null;
+  const SCALE=[261.63,293.66,329.63,349.23,392,440,493.88,523.25];
+  const BATTLE_MELODY=[0,2,4,5,4,2,0,2,4,7,5,4,2,0,4,5,7,5,4,2,0,2,5,4];
+  const TITLE_MELODY =[4,5,7,5,4,2,0,2,4,5,7,9,7,5,4,5,7,5,2,0];
+
+  function init(){
+    if(ctx) return;
+    ctx = new (window.AudioContext||window.webkitAudioContext)();
+    masterGain = ctx.createGain();
+    masterGain.gain.value = 0.18;
+    masterGain.connect(ctx.destination);
+  }
+  function playNote(freq, dur, vol=0.18, type='triangle'){
+    if(!ctx||!playing) return;
+    const osc=ctx.createOscillator();
+    const g=ctx.createGain();
+    osc.type=type;
+    osc.frequency.value=freq;
+    g.gain.setValueAtTime(vol,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur);
+    osc.connect(g); g.connect(masterGain);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime+dur);
+  }
+  function startMelody(melody, bpm=120){
+    stopAll();
+    playing=true; noteIdx=0; notes=melody;
+    const beat=60000/bpm;
+    interval=setInterval(()=>{
+      if(!playing) return;
+      const n=notes[noteIdx%notes.length];
+      const freq=SCALE[n%8]*(n>=8?2:1);
+      playNote(freq, beat/900, 0.15);
+      noteIdx++;
+    },beat/2);
+  }
+  function stopAll(){
+    playing=false;
+    if(interval){clearInterval(interval);interval=null;}
+  }
+  function toggle(){
+    if(!ctx) init();
+    if(playing){ stopAll(); return false; }
+    else{ startMelody(TITLE_MELODY,100); return true; }
+  }
+  function setBattle(){ if(playing){ startMelody(BATTLE_MELODY,140); } }
+  function setTitle(){ if(playing){ startMelody(TITLE_MELODY,100); } }
+  function isPlaying(){ return playing; }
+  return {init,toggle,setBattle,setTitle,isPlaying};
+})();
+
+document.getElementById('musicBtn').addEventListener('click',()=>{
+  MusicEngine.init();
+  const on=MusicEngine.toggle();
+  document.getElementById('musicBtn').textContent=on?'🔊':'🔇';
+});
+
+// ── SPRITE ART (inline SVG – no external images needed) ──
+const SPRITES = {
+  // Guardians
+  fire_g:`<svg viewBox="0 0 60 70" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="30" cy="58" rx="14" ry="6" fill="#1a0800" opacity="0.5"/>
+    <rect x="22" y="40" width="6" height="18" rx="3" fill="#8B2500"/>
+    <rect x="32" y="40" width="6" height="18" rx="3" fill="#8B2500"/>
+    <rect x="18" y="22" width="24" height="22" rx="8" fill="#C84000"/>
+    <rect x="10" y="24" width="10" height="14" rx="5" fill="#C84000"/>
+    <rect x="40" y="24" width="10" height="14" rx="5" fill="#C84000"/>
+    <circle cx="30" cy="14" r="12" fill="#E05000"/>
+    <circle cx="25" cy="11" r="3" fill="#fff"/>
+    <circle cx="35" cy="11" r="3" fill="#fff"/>
+    <circle cx="26" cy="11" r="1.5" fill="#1a0800"/>
+    <circle cx="36" cy="11" r="1.5" fill="#1a0800"/>
+    <path d="M26 17 Q30 20 34 17" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M28 2 Q30 8 32 2 Q34 9 36 3 Q33 12 30 10 Q27 12 24 3 Q26 9 28 2Z" fill="#FF6B00"/>
+    <path d="M24 4 Q26 10 28 5 Q26 13 30 11 Q28 13 25 6Z" fill="#FFD700" opacity="0.7"/>
+  </svg>`,
+  water_g:`<svg viewBox="0 0 60 70" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="30" cy="58" rx="14" ry="6" fill="#000d1a" opacity="0.5"/>
+    <rect x="22" y="40" width="6" height="18" rx="3" fill="#005580"/>
+    <rect x="32" y="40" width="6" height="18" rx="3" fill="#005580"/>
+    <rect x="18" y="22" width="24" height="22" rx="8" fill="#0077aa"/>
+    <rect x="10" y="24" width="10" height="14" rx="5" fill="#0077aa"/>
+    <rect x="40" y="24" width="10" height="14" rx="5" fill="#0077aa"/>
+    <circle cx="30" cy="14" r="12" fill="#0099cc"/>
+    <circle cx="25" cy="11" r="3" fill="#fff"/>
+    <circle cx="35" cy="11" r="3" fill="#fff"/>
+    <circle cx="26" cy="11" r="1.5" fill="#003344"/>
+    <circle cx="36" cy="11" r="1.5" fill="#003344"/>
+    <path d="M26 17 Q30 20 34 17" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M30 1 Q34 7 37 4 Q35 12 30 10 Q25 12 23 4 Q26 7 30 1Z" fill="#4FC3F7"/>
+    <path d="M29 3 Q32 8 34 5 Q32 11 30 10Z" fill="#fff" opacity="0.5"/>
+  </svg>`,
+  earth_g:`<svg viewBox="0 0 60 70" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="30" cy="58" rx="14" ry="6" fill="#071407" opacity="0.5"/>
+    <rect x="22" y="40" width="6" height="18" rx="3" fill="#2d5a27"/>
+    <rect x="32" y="40" width="6" height="18" rx="3" fill="#2d5a27"/>
+    <rect x="18" y="22" width="24" height="22" rx="8" fill="#3a7a33"/>
+    <rect x="10" y="24" width="10" height="14" rx="5" fill="#3a7a33"/>
+    <rect x="40" y="24" width="10" height="14" rx="5" fill="#3a7a33"/>
+    <circle cx="30" cy="14" r="12" fill="#4a9a42"/>
+    <circle cx="25" cy="11" r="3" fill="#fff"/>
+    <circle cx="35" cy="11" r="3" fill="#fff"/>
+    <circle cx="26" cy="11" r="1.5" fill="#1a2a18"/>
+    <circle cx="36" cy="11" r="1.5" fill="#1a2a18"/>
+    <path d="M26 17 Q30 20 34 17" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <circle cx="24" cy="3" r="3" fill="#81C784"/>
+    <circle cx="30" cy="1" r="3.5" fill="#66bb6a"/>
+    <circle cx="36" cy="3" r="3" fill="#81C784"/>
+    <path d="M20 6 Q30 2 40 6" stroke="#4caf50" stroke-width="1" fill="none"/>
+  </svg>`,
+  storm_g:`<svg viewBox="0 0 60 70" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="30" cy="58" rx="14" ry="6" fill="#1a1400" opacity="0.5"/>
+    <rect x="22" y="40" width="6" height="18" rx="3" fill="#6a5500"/>
+    <rect x="32" y="40" width="6" height="18" rx="3" fill="#6a5500"/>
+    <rect x="18" y="22" width="24" height="22" rx="8" fill="#8a7200"/>
+    <rect x="10" y="24" width="10" height="14" rx="5" fill="#8a7200"/>
+    <rect x="40" y="24" width="10" height="14" rx="5" fill="#8a7200"/>
+    <circle cx="30" cy="14" r="12" fill="#b09000"/>
+    <circle cx="25" cy="11" r="3" fill="#fff"/>
+    <circle cx="35" cy="11" r="3" fill="#fff"/>
+    <circle cx="26" cy="11" r="1.5" fill="#2a1a00"/>
+    <circle cx="36" cy="11" r="1.5" fill="#2a1a00"/>
+    <path d="M26 17 Q30 20 34 17" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <polygon points="30,0 33,7 40,5 34,11 37,18 30,13 23,18 26,11 20,5 27,7" fill="#FFD700"/>
+    <polygon points="30,3 32,8 37,6 33,11 35,16 30,12 25,16 27,11 23,6 28,8" fill="#fff" opacity="0.5"/>
+  </svg>`,
+  ice_g:`<svg viewBox="0 0 60 70" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="30" cy="58" rx="14" ry="6" fill="#000d1a" opacity="0.5"/>
+    <rect x="22" y="40" width="6" height="18" rx="3" fill="#1a4a6a"/>
+    <rect x="32" y="40" width="6" height="18" rx="3" fill="#1a4a6a"/>
+    <rect x="18" y="22" width="24" height="22" rx="8" fill="#2a6a9a"/>
+    <rect x="10" y="24" width="10" height="14" rx="5" fill="#2a6a9a"/>
+    <rect x="40" y="24" width="10" height="14" rx="5" fill="#2a6a9a"/>
+    <circle cx="30" cy="14" r="12" fill="#4a8aba"/>
+    <circle cx="25" cy="11" r="3" fill="#e0f4ff"/>
+    <circle cx="35" cy="11" r="3" fill="#e0f4ff"/>
+    <circle cx="26" cy="11" r="1.5" fill="#003355"/>
+    <circle cx="36" cy="11" r="1.5" fill="#003355"/>
+    <path d="M26 17 Q30 20 34 17" stroke="#e0f4ff" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <line x1="30" y1="0" x2="30" y2="10" stroke="#B3E5FC" stroke-width="2"/>
+    <line x1="21" y1="5" x2="39" y2="5" stroke="#B3E5FC" stroke-width="2"/>
+    <line x1="23" y1="2" x2="37" y2="8" stroke="#B3E5FC" stroke-width="1.5"/>
+    <line x1="37" y1="2" x2="23" y2="8" stroke="#B3E5FC" stroke-width="1.5"/>
+    <circle cx="30" cy="5" r="2" fill="#fff"/>
+  </svg>`,
+  shadow_g:`<svg viewBox="0 0 60 70" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="30" cy="58" rx="14" ry="6" fill="#0d0014" opacity="0.5"/>
+    <rect x="22" y="40" width="6" height="18" rx="3" fill="#3a1a5a"/>
+    <rect x="32" y="40" width="6" height="18" rx="3" fill="#3a1a5a"/>
+    <rect x="18" y="22" width="24" height="22" rx="8" fill="#5a2a8a"/>
+    <rect x="10" y="24" width="10" height="14" rx="5" fill="#5a2a8a"/>
+    <rect x="40" y="24" width="10" height="14" rx="5" fill="#5a2a8a"/>
+    <circle cx="30" cy="14" r="12" fill="#7a3aaa"/>
+    <circle cx="25" cy="11" r="3.5" fill="#CE93D8"/>
+    <circle cx="35" cy="11" r="3.5" fill="#CE93D8"/>
+    <circle cx="25" cy="11" r="2" fill="#1a0028"/>
+    <circle cx="35" cy="11" r="2" fill="#1a0028"/>
+    <path d="M26 17 Q30 20 34 17" stroke="#CE93D8" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M18 0 Q22 6 18 10 Q25 5 30 8 Q35 5 42 10 Q38 6 42 0 Q36 8 30 4 Q24 8 18 0Z" fill="#CE93D8" opacity="0.8"/>
+  </svg>`,
+  // Monsters
+  fire_m:`<svg viewBox="0 0 70 70" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="35" cy="64" rx="18" ry="5" fill="#1a0800" opacity="0.4"/>
+    <path d="M15 55 Q20 45 15 35 Q25 42 20 30 Q30 38 25 22 Q35 30 30 18 Q40 28 37 15 Q45 25 40 12 Q50 30 45 42 Q55 35 50 50 Q55 55 50 60 Q40 65 30 65 Q20 65 15 55Z" fill="#CC3300"/>
+    <path d="M22 50 Q25 42 22 36 Q28 41 25 32 Q32 38 30 26 Q37 33 35 22 Q40 30 38 20 Q44 30 41 40 Q48 35 44 48 Q46 52 43 56 Q37 60 30 60 Q24 60 22 50Z" fill="#FF4400"/>
+    <path d="M28 48 Q30 42 28 38 Q33 42 32 35 Q37 40 36 30 Q40 36 39 28 Q43 34 40 42 Q44 38 42 46 Q43 50 40 54 Q37 57 33 57 Q29 57 28 48Z" fill="#FF6600"/>
+    <circle cx="28" cy="38" r="5" fill="#fff"/>
+    <circle cx="42" cy="38" r="5" fill="#fff"/>
+    <circle cx="29" cy="38" r="3" fill="#1a0800"/>
+    <circle cx="43" cy="38" r="3" fill="#1a0800"/>
+    <circle cx="30" cy="37" r="1" fill="#FF4400"/>
+    <circle cx="44" cy="37" r="1" fill="#FF4400"/>
+    <path d="M30 46 Q35 50 40 46" stroke="#CC3300" stroke-width="2" fill="none"/>
+    <path d="M32 48 L33 52 M35 49 L35 53 M38 48 L37 52" stroke="#CC3300" stroke-width="1.5"/>
+    <path d="M8 30 Q12 20 8 10 Q16 18 14 8 Q20 16 17 5 Q24 14 21 3 Q27 14 24 8 Q28 18 22 26" fill="#FF6600" opacity="0.8"/>
+    <path d="M55 28 Q60 18 56 8 Q62 16 61 6 Q66 14 63 4 Q67 15 64 10 Q66 20 60 26" fill="#FF4400" opacity="0.8"/>
+  </svg>`,
+  water_m:`<svg viewBox="0 0 70 70" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="35" cy="64" rx="18" ry="5" fill="#000d1a" opacity="0.4"/>
+    <ellipse cx="35" cy="40" rx="25" ry="22" fill="#006699"/>
+    <ellipse cx="35" cy="38" rx="22" ry="20" fill="#0088cc"/>
+    <circle cx="26" cy="33" r="6" fill="#fff"/>
+    <circle cx="44" cy="33" r="6" fill="#fff"/>
+    <circle cx="27" cy="33" r="4" fill="#003355"/>
+    <circle cx="45" cy="33" r="4" fill="#003355"/>
+    <circle cx="28" cy="32" r="1.5" fill="#66ccff"/>
+    <circle cx="46" cy="32" r="1.5" fill="#66ccff"/>
+    <path d="M28 42 Q35 47 42 42" stroke="#003355" stroke-width="2" fill="none"/>
+    <path d="M10 30 Q5 25 8 18 Q12 22 10 16 Q15 21 13 14 Q18 20 16 13 Q20 19 17 25 Q22 22 20 30" fill="#0099cc" opacity="0.9"/>
+    <path d="M60 30 Q65 25 62 18 Q58 22 60 16 Q55 21 57 14 Q52 20 54 13 Q50 19 53 25 Q48 22 50 30" fill="#0077aa" opacity="0.9"/>
+    <path d="M20 55 Q25 62 35 63 Q45 62 50 55 Q42 60 35 60 Q28 60 20 55Z" fill="#005580"/>
+    <ellipse cx="35" cy="16" rx="15" ry="8" fill="#0099cc"/>
+    <path d="M22 14 Q35 8 48 14" stroke="#66ccff" stroke-width="2" fill="none"/>
+    <path d="M25 12 Q35 6 45 12" stroke="#99ddff" stroke-width="1.5" fill="none" opacity="0.6"/>
+  </svg>`,
+  earth_m:`<svg viewBox="0 0 70 70" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="35" cy="64" rx="20" ry="5" fill="#071407" opacity="0.4"/>
+    <rect x="12" y="25" width="46" height="35" rx="10" fill="#4a6620"/>
+    <rect x="15" y="28" width="40" height="30" rx="8" fill="#5a7a28"/>
+    <rect x="6" y="32" width="16" height="20" rx="6" fill="#4a6620"/>
+    <rect x="48" y="32" width="16" height="20" rx="6" fill="#4a6620"/>
+    <circle cx="26" cy="38" r="6" fill="#fff"/>
+    <circle cx="44" cy="38" r="6" fill="#fff"/>
+    <circle cx="27" cy="38" r="4" fill="#2a3a10"/>
+    <circle cx="45" cy="38" r="4" fill="#2a3a10"/>
+    <circle cx="28" cy="37" r="1.5" fill="#88cc44"/>
+    <circle cx="46" cy="37" r="1.5" fill="#88cc44"/>
+    <path d="M29 48 Q35 53 41 48" stroke="#2a3a10" stroke-width="2.5" fill="none"/>
+    <rect x="16" y="20" width="38" height="12" rx="6" fill="#5a7a28"/>
+    <path d="M20 22 Q25 16 30 20 Q35 14 40 20 Q45 16 50 22" fill="#6a9a30" stroke="none"/>
+    <circle cx="28" cy="18" r="4" fill="#81C784"/>
+    <circle cx="35" cy="15" r="5" fill="#66bb6a"/>
+    <circle cx="42" cy="18" r="4" fill="#81C784"/>
+    <rect x="18" y="54" width="6" height="10" rx="3" fill="#3a5518"/>
+    <rect x="46" y="54" width="6" height="10" rx="3" fill="#3a5518"/>
+  </svg>`,
+  storm_m:`<svg viewBox="0 0 70 70" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="35" cy="64" rx="18" ry="5" fill="#1a1400" opacity="0.4"/>
+    <ellipse cx="35" cy="38" rx="22" ry="24" fill="#7a6600"/>
+    <ellipse cx="35" cy="36" rx="19" ry="21" fill="#9a8200"/>
+    <circle cx="26" cy="32" r="6" fill="#fff"/>
+    <circle cx="44" cy="32" r="6" fill="#fff"/>
+    <circle cx="27" cy="32" r="4" fill="#2a1a00"/>
+    <circle cx="45" cy="32" r="4" fill="#2a1a00"/>
+    <circle cx="28" cy="31" r="1.5" fill="#FFD700"/>
+    <circle cx="46" cy="31" r="1.5" fill="#FFD700"/>
+    <path d="M28 42 Q35 48 42 42" stroke="#2a1a00" stroke-width="2" fill="none"/>
+    <path d="M14 15 L18 25 L12 23 L17 33 L10 30 L16 42" stroke="#FFD700" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M56 15 L52 25 L58 23 L53 33 L60 30 L54 42" stroke="#FFD700" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <polygon points="35,5 38,15 48,12 41,20 45,30 35,24 25,30 29,20 22,12 32,15" fill="#FFD700"/>
+    <polygon points="35,8 37,15 44,13 39,19 42,26 35,22 28,26 31,19 26,13 33,15" fill="#fff" opacity="0.5"/>
+  </svg>`,
+  ice_m:`<svg viewBox="0 0 70 70" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="35" cy="64" rx="18" ry="5" fill="#000d1a" opacity="0.4"/>
+    <polygon points="35,8 50,20 50,50 35,62 20,50 20,20" fill="#2a6a9a"/>
+    <polygon points="35,12 47,22 47,48 35,58 23,48 23,22" fill="#4a8aba"/>
+    <circle cx="27" cy="32" r="6" fill="#e0f4ff"/>
+    <circle cx="43" cy="32" r="6" fill="#e0f4ff"/>
+    <circle cx="28" cy="32" r="4" fill="#003355"/>
+    <circle cx="44" cy="32" r="4" fill="#003355"/>
+    <circle cx="29" cy="31" r="1.5" fill="#B3E5FC"/>
+    <circle cx="45" cy="31" r="1.5" fill="#B3E5FC"/>
+    <path d="M28 42 Q35 47 42 42" stroke="#003355" stroke-width="2" fill="none"/>
+    <line x1="35" y1="4" x2="35" y2="14" stroke="#B3E5FC" stroke-width="2.5"/>
+    <line x1="25" y1="7" x2="45" y2="13" stroke="#B3E5FC" stroke-width="2"/>
+    <line x1="45" y1="7" x2="25" y2="13" stroke="#B3E5FC" stroke-width="2"/>
+    <line x1="35" y1="58" x2="35" y2="65" stroke="#B3E5FC" stroke-width="2"/>
+    <polygon points="35,4 37,9 42,7 38,11 40,16 35,12 30,16 32,11 28,7 33,9" fill="#fff" opacity="0.8"/>
+  </svg>`,
+  shadow_m:`<svg viewBox="0 0 70 70" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="35" cy="64" rx="18" ry="5" fill="#0d0014" opacity="0.4"/>
+    <path d="M35 8 Q50 15 55 32 Q58 48 48 58 Q40 65 35 65 Q30 65 22 58 Q12 48 15 32 Q20 15 35 8Z" fill="#3a1a5a"/>
+    <path d="M35 12 Q48 18 52 33 Q54 46 45 55 Q38 61 35 61 Q32 61 25 55 Q16 46 18 33 Q22 18 35 12Z" fill="#5a2a8a"/>
+    <circle cx="27" cy="33" r="7" fill="#CE93D8"/>
+    <circle cx="43" cy="33" r="7" fill="#CE93D8"/>
+    <circle cx="27" cy="33" r="4.5" fill="#1a0028"/>
+    <circle cx="43" cy="33" r="4.5" fill="#1a0028"/>
+    <circle cx="28" cy="32" r="2" fill="#FF88FF"/>
+    <circle cx="44" cy="32" r="2" fill="#FF88FF"/>
+    <path d="M27 44 Q35 50 43 44" stroke="#CE93D8" stroke-width="2" fill="none"/>
+    <path d="M10 20 Q5 30 10 40 Q16 30 12 20Z" fill="#CE93D8" opacity="0.7"/>
+    <path d="M60 20 Q65 30 60 40 Q54 30 58 20Z" fill="#CE93D8" opacity="0.7"/>
+    <path d="M18 10 Q20 18 16 24 Q22 18 20 10Z" fill="#9a5aca" opacity="0.8"/>
+    <path d="M52 10 Q50 18 54 24 Q48 18 50 10Z" fill="#9a5aca" opacity="0.8"/>
+    <circle cx="35" cy="5" r="4" fill="#CE93D8" opacity="0.6"/>
+    <circle cx="28" cy="7" r="2.5" fill="#9a5aca" opacity="0.5"/>
+    <circle cx="42" cy="7" r="2.5" fill="#9a5aca" opacity="0.5"/>
+  </svg>`
+};
+
+// ── WORLD NAMES per grade per world ──
+const WORLD_NAMES = {
+  3: ['Meadow Vale','Sunstone Keep','Crystal Brook','Harvest Hollow','Rainbow Ridge'],
+  4: ['Iron Bastion','Thunder Spire','Gilded Gorge','Ember Moor','Titan\'s Peak'],
+  5: ['Nebula Reach','Fractured Falls','Prime Citadel','Ratio Reef','Decimal Deep'],
+  6: ['Equation Expanse','Variable Vault','Radical Ruins','Data Dome','Proportion Pass'],
+  7: ['Algebra Abyss','Integer Isle','Exponent Edge','Function Forge','Infinity Gate']
+};
+
+// ── ELEMENT DEFINITIONS ──
+const ELEMENTS=[
+  {id:'fire',  name:'Fire',   emoji:'🔥',color:'#FF6B35',darkColor:'#8B2500',
+   bg:'radial-gradient(135deg,#2a0800,#1a0400)',cssClass:'e-fire',
+   desc:'Harness the raging inferno. Fire attacks burn through defenses with raw power.',
+   power:'Blazing Strike',trait:'High damage on combos',
+   guardianName:'Pyra the Flame Sage',monsterName:'Cinder Brute',
+   guardianSprite:'fire_g',monsterSprite:'fire_m'},
+  {id:'water', name:'Water',  emoji:'💧',color:'#4FC3F7',darkColor:'#003366',
+   bg:'radial-gradient(135deg,#001428,#000a14)',cssClass:'e-water',
+   desc:'Flow like the tide. Water magic adapts and overwhelms with fluid precision.',
+   power:'Tidal Surge',trait:'HP restore on streak 5+',
+   guardianName:'Marina the Tide Keeper',monsterName:'Abyss Leviathan',
+   guardianSprite:'water_g',monsterSprite:'water_m'},
+  {id:'earth', name:'Earth',  emoji:'🌿',color:'#81C784',darkColor:'#1B5E20',
+   bg:'radial-gradient(135deg,#0a1f0a,#050f05)',cssClass:'e-earth',
+   desc:'Stand firm as stone. Earth power turns defense into unstoppable force.',
+   power:'Quake Slam',trait:'Reduced HP loss on wrong answers',
+   guardianName:'Gaia the Root Warden',monsterName:'Golem Titan',
+   guardianSprite:'earth_g',monsterSprite:'earth_m'},
+  {id:'storm', name:'Storm',  emoji:'⚡',color:'#FFD54F',darkColor:'#4A3500',
+   bg:'radial-gradient(135deg,#1a1400,#0d0a00)',cssClass:'e-storm',
+   desc:'Strike with lightning speed. Storm power chains questions for massive combo damage.',
+   power:'Thunder Chain',trait:'Double coins on perfect answer',
+   guardianName:'Zephyr the Storm Caller',monsterName:'Tempest Wyrm',
+   guardianSprite:'storm_g',monsterSprite:'storm_m'},
+  {id:'ice',   name:'Ice',    emoji:'❄️',color:'#B3E5FC',darkColor:'#01579B',
+   bg:'radial-gradient(135deg,#001428,#00050a)',cssClass:'e-ice',
+   desc:'Freeze time itself. Ice magic slows the enemy while your power grows.',
+   power:'Blizzard Lock',trait:'Extra XP from each correct answer',
+   guardianName:'Crysta the Frost Oracle',monsterName:'Glacial Hydra',
+   guardianSprite:'ice_g',monsterSprite:'ice_m'},
+  {id:'shadow',name:'Shadow', emoji:'🌑',color:'#CE93D8',darkColor:'#4A148C',
+   bg:'radial-gradient(135deg,#0d001a,#060008)',cssClass:'e-shadow',
+   desc:'Embrace the void. Shadow powers grow stronger the longer you survive.',
+   power:'Void Drain',trait:'Streak bonus multiplied ×2',
+   guardianName:'Nyx the Veil Walker',monsterName:'Nightmare Wraith',
+   guardianSprite:'shadow_g',monsterSprite:'shadow_m'}
+];
+
+// ── QUESTIONS (all grades, all worlds, 30 per world) ──
+const ALL_QUESTIONS={"3":{"1":[{"q":"5 + 8 = ?","a":"13","ch":["11","12","13","14"]},{"q":"9 - 4 = ?","a":"5","ch":["3","4","5","6"]},{"q":"3 × 4 = ?","a":"12","ch":["9","10","11","12"]},{"q":"What is half of 10?","a":"5","ch":["4","5","6","7"]},{"q":"12 ÷ 3 = ?","a":"4","ch":["3","4","5","6"]},{"q":"7 + 6 = ?","a":"13","ch":["11","12","13","14"]},{"q":"15 - 7 = ?","a":"8","ch":["6","7","8","9"]},{"q":"2 × 9 = ?","a":"18","ch":["16","17","18","19"]},{"q":"20 ÷ 4 = ?","a":"5","ch":["4","5","6","7"]},{"q":"8 + 9 = ?","a":"17","ch":["15","16","17","18"]},{"q":"14 - 6 = ?","a":"8","ch":["6","7","8","9"]},{"q":"5 × 5 = ?","a":"25","ch":["20","22","25","30"]},{"q":"18 ÷ 2 = ?","a":"9","ch":["7","8","9","10"]},{"q":"6 + 7 = ?","a":"13","ch":["11","12","13","14"]},{"q":"17 - 9 = ?","a":"8","ch":["6","7","8","9"]},{"q":"4 × 6 = ?","a":"24","ch":["20","22","24","26"]},{"q":"15 ÷ 3 = ?","a":"5","ch":["3","4","5","6"]},{"q":"9 + 7 = ?","a":"16","ch":["14","15","16","17"]},{"q":"13 - 5 = ?","a":"8","ch":["6","7","8","9"]},{"q":"3 × 7 = ?","a":"21","ch":["18","20","21","24"]},{"q":"24 ÷ 6 = ?","a":"4","ch":["3","4","5","6"]},{"q":"8 + 5 = ?","a":"13","ch":["11","12","13","14"]},{"q":"16 - 8 = ?","a":"8","ch":["6","7","8","9"]},{"q":"2 × 7 = ?","a":"14","ch":["12","13","14","16"]},{"q":"21 ÷ 7 = ?","a":"3","ch":["2","3","4","5"]},{"q":"What is double 6?","a":"12","ch":["10","11","12","13"]},{"q":"10 + 8 = ?","a":"18","ch":["16","17","18","19"]},{"q":"20 - 11 = ?","a":"9","ch":["7","8","9","10"]},{"q":"5 × 4 = ?","a":"20","ch":["16","18","20","22"]},{"q":"16 ÷ 4 = ?","a":"4","ch":["2","3","4","5"]}],"2":[{"q":"32 + 15 = ?","a":"47","ch":["44","46","47","48"]},{"q":"50 - 23 = ?","a":"27","ch":["25","26","27","28"]},{"q":"6 × 8 = ?","a":"48","ch":["42","46","48","54"]},{"q":"36 ÷ 4 = ?","a":"9","ch":["7","8","9","10"]},{"q":"100 - 37 = ?","a":"63","ch":["61","62","63","64"]},{"q":"45 + 28 = ?","a":"73","ch":["71","72","73","74"]},{"q":"7 × 7 = ?","a":"49","ch":["42","47","49","56"]},{"q":"56 ÷ 8 = ?","a":"7","ch":["5","6","7","8"]},{"q":"63 - 27 = ?","a":"36","ch":["34","35","36","37"]},{"q":"9 × 6 = ?","a":"54","ch":["48","52","54","56"]},{"q":"72 ÷ 9 = ?","a":"8","ch":["6","7","8","9"]},{"q":"48 + 36 = ?","a":"84","ch":["82","83","84","86"]},{"q":"8 × 8 = ?","a":"64","ch":["56","60","64","72"]},{"q":"81 ÷ 9 = ?","a":"9","ch":["7","8","9","10"]},{"q":"75 - 38 = ?","a":"37","ch":["35","36","37","38"]},{"q":"7 × 9 = ?","a":"63","ch":["56","61","63","67"]},{"q":"64 ÷ 8 = ?","a":"8","ch":["6","7","8","9"]},{"q":"53 + 29 = ?","a":"82","ch":["80","81","82","83"]},{"q":"90 - 45 = ?","a":"45","ch":["43","44","45","46"]},{"q":"6 × 9 = ?","a":"54","ch":["48","52","54","56"]},{"q":"42 ÷ 6 = ?","a":"7","ch":["5","6","7","8"]},{"q":"67 + 25 = ?","a":"92","ch":["90","91","92","93"]},{"q":"100 - 64 = ?","a":"36","ch":["34","35","36","37"]},{"q":"8 × 7 = ?","a":"56","ch":["48","52","56","63"]},{"q":"45 ÷ 5 = ?","a":"9","ch":["7","8","9","10"]},{"q":"34 + 47 = ?","a":"81","ch":["79","80","81","82"]},{"q":"83 - 46 = ?","a":"37","ch":["35","36","37","38"]},{"q":"9 × 9 = ?","a":"81","ch":["72","80","81","90"]},{"q":"48 ÷ 6 = ?","a":"8","ch":["6","7","8","9"]},{"q":"56 + 38 = ?","a":"94","ch":["92","93","94","95"]}],"3":[{"q":"1/2 of 8 = ?","a":"4","ch":["2","3","4","5"]},{"q":"Shape with 4 equal sides?","a":"Square","ch":["Rectangle","Square","Triangle","Circle"]},{"q":"How many cm in 1 m?","a":"100","ch":["10","100","1000","10000"]},{"q":"1/4 of 12 = ?","a":"3","ch":["2","3","4","6"]},{"q":"Shape with 3 sides?","a":"Triangle","ch":["Square","Circle","Triangle","Pentagon"]},{"q":"Perimeter of square, side=5?","a":"20","ch":["10","15","20","25"]},{"q":"1/2 of 14 = ?","a":"7","ch":["5","6","7","8"]},{"q":"Sides of a hexagon?","a":"6","ch":["5","6","7","8"]},{"q":"3/4 of 8 = ?","a":"6","ch":["4","5","6","7"]},{"q":"Area: rectangle 3×5 = ?","a":"15","ch":["8","10","15","20"]},{"q":"1/3 of 9 = ?","a":"3","ch":["2","3","4","5"]},{"q":"How many mm in 1 cm?","a":"10","ch":["1","10","100","1000"]},{"q":"1/2 + 1/2 = ?","a":"1","ch":["1/4","1/2","1","2"]},{"q":"Perimeter: rectangle 4×6 = ?","a":"20","ch":["10","16","20","24"]},{"q":"1/4 + 1/4 = ?","a":"1/2","ch":["1/4","1/2","3/4","1"]},{"q":"Sides of a pentagon?","a":"5","ch":["4","5","6","7"]},{"q":"Area: square side=4 = ?","a":"16","ch":["8","12","16","20"]},{"q":"1/3 + 1/3 = ?","a":"2/3","ch":["1/3","2/3","3/3","1"]},{"q":"Largest: 1/2, 1/3, or 1/4?","a":"1/2","ch":["1/4","1/3","1/2","all equal"]},{"q":"Perimeter: triangle 3+4+5 = ?","a":"12","ch":["10","11","12","13"]},{"q":"1/2 of 20 = ?","a":"10","ch":["5","8","10","12"]},{"q":"Days in a week?","a":"7","ch":["5","6","7","8"]},{"q":"Area: rectangle 7×2 = ?","a":"14","ch":["9","12","14","18"]},{"q":"3/4 of 12 = ?","a":"9","ch":["6","8","9","10"]},{"q":"Months in a year?","a":"12","ch":["10","11","12","13"]},{"q":"1/4 of 20 = ?","a":"5","ch":["4","5","6","7"]},{"q":"Right angle = ? degrees","a":"90","ch":["45","60","90","180"]},{"q":"1/2 of 18 = ?","a":"9","ch":["6","8","9","10"]},{"q":"Perimeter: square side=8 = ?","a":"32","ch":["16","24","32","64"]},{"q":"2/4 simplified = ?","a":"1/2","ch":["1/4","1/2","2/4","3/4"]}],"4":[{"q":"$1.25 + $0.75 = ?","a":"$2.00","ch":["$1.75","$2.00","$2.25","$2.50"]},{"q":"2 hours after 3:00 = ?","a":"5:00","ch":["4:00","5:00","6:00","7:00"]},{"q":"Round 47 to nearest 10","a":"50","ch":["40","45","50","55"]},{"q":"$5.00 - $2.35 = ?","a":"$2.65","ch":["$2.55","$2.65","$2.75","$3.65"]},{"q":"30 min after 4:15 = ?","a":"4:45","ch":["4:30","4:45","5:00","5:15"]},{"q":"Round 83 to nearest 10","a":"80","ch":["70","80","85","90"]},{"q":"$3.50 + $1.75 = ?","a":"$5.25","ch":["$4.75","$5.00","$5.25","$5.50"]},{"q":"1 hr before 6:00 = ?","a":"5:00","ch":["4:00","5:00","6:00","7:00"]},{"q":"Round 135 to nearest 100","a":"100","ch":["100","130","140","200"]},{"q":"$10.00 - $3.45 = ?","a":"$6.55","ch":["$6.45","$6.55","$7.55","$8.55"]},{"q":"Minutes in 2 hours?","a":"120","ch":["60","90","120","180"]},{"q":"Round 256 to nearest 10","a":"260","ch":["250","255","260","300"]},{"q":"$0.50 + $0.75 = ?","a":"$1.25","ch":["$0.75","$1.00","$1.25","$1.50"]},{"q":"45 min after 2:15 = ?","a":"3:00","ch":["2:45","3:00","3:15","3:30"]},{"q":"Round 475 to nearest 100","a":"500","ch":["400","450","500","480"]},{"q":"$7.25 - $3.50 = ?","a":"$3.75","ch":["$3.25","$3.50","$3.75","$4.25"]},{"q":"Seconds in 1 minute?","a":"60","ch":["30","45","60","90"]},{"q":"Round 749 to nearest 100","a":"700","ch":["700","740","750","800"]},{"q":"$4.80 + $2.30 = ?","a":"$7.10","ch":["$6.90","$7.00","$7.10","$7.20"]},{"q":"2 hrs after 11:30 = ?","a":"1:30","ch":["12:30","1:00","1:30","2:00"]},{"q":"Round 62 to nearest 10","a":"60","ch":["50","60","65","70"]},{"q":"$20.00 - $12.50 = ?","a":"$7.50","ch":["$6.50","$7.00","$7.50","$8.50"]},{"q":"Hours in a day?","a":"24","ch":["12","20","24","36"]},{"q":"Round 388 to nearest 100","a":"400","ch":["300","380","390","400"]},{"q":"$6.99 + $3.01 = ?","a":"$10.00","ch":["$9.00","$10.00","$10.90","$11.00"]},{"q":"15 min before 9:00 = ?","a":"8:45","ch":["8:30","8:45","9:15","9:45"]},{"q":"Round 950 to nearest 100","a":"1000","ch":["900","950","1000","1100"]},{"q":"$8.40 - $4.15 = ?","a":"$4.25","ch":["$3.75","$4.25","$4.35","$5.25"]},{"q":"Weeks in a year?","a":"52","ch":["48","50","52","54"]},{"q":"Round 1,452 to nearest 1000","a":"1000","ch":["1000","1400","1500","2000"]}],"5":[{"q":"Hundreds digit in 3,472?","a":"4","ch":["2","3","4","7"]},{"q":"4/8 vs 3/6?","a":"Equal","ch":["4/8","3/6","Equal","Cannot tell"]},{"q":"345 × 2 = ?","a":"690","ch":["680","690","700","710"]},{"q":"500 ÷ 5 = ?","a":"100","ch":["10","50","100","500"]},{"q":"Value of 7 in 2,783?","a":"700","ch":["7","70","700","7000"]},{"q":"2/3 vs 3/4: which greater?","a":"3/4","ch":["2/3","3/4","Equal","Cannot tell"]},{"q":"234 × 3 = ?","a":"702","ch":["692","700","702","712"]},{"q":"600 ÷ 6 = ?","a":"100","ch":["10","60","100","1000"]},{"q":"Thousands digit in 5,628?","a":"5","ch":["2","5","6","8"]},{"q":"1/4 vs 1/3: which less?","a":"1/4","ch":["1/4","1/3","Equal","Cannot tell"]},{"q":"125 × 4 = ?","a":"500","ch":["400","480","500","520"]},{"q":"800 ÷ 4 = ?","a":"200","ch":["20","200","400","800"]},{"q":"3,000+400+50+2 = ?","a":"3,452","ch":["3,425","3,452","3,542","4,352"]},{"q":"5/6 vs 4/5: which greater?","a":"5/6","ch":["5/6","4/5","Equal","Cannot tell"]},{"q":"213 × 3 = ?","a":"639","ch":["619","629","639","649"]},{"q":"900 ÷ 3 = ?","a":"300","ch":["30","300","600","900"]},{"q":"Round 6,473 to nearest 1000","a":"6000","ch":["6000","6400","6500","7000"]},{"q":"Fraction = 0.5?","a":"1/2","ch":["1/3","1/2","2/3","5/10"]},{"q":"412 × 2 = ?","a":"824","ch":["814","820","824","834"]},{"q":"400 ÷ 8 = ?","a":"50","ch":["40","50","80","400"]},{"q":"2,000+600+7 = ?","a":"2,607","ch":["2,067","2,607","2,670","2,706"]},{"q":"3/8 vs 2/5: which greater?","a":"2/5","ch":["3/8","2/5","Equal","Cannot tell"]},{"q":"321 × 3 = ?","a":"963","ch":["943","953","963","973"]},{"q":"700 ÷ 7 = ?","a":"100","ch":["10","70","100","700"]},{"q":"4 thousands 3 hundreds 2 tens 1 one?","a":"4,321","ch":["4,123","4,312","4,321","4,231"]},{"q":"7/8 vs 5/6: which less?","a":"5/6","ch":["7/8","5/6","Equal","Cannot tell"]},{"q":"143 × 6 = ?","a":"858","ch":["838","848","858","868"]},{"q":"360 ÷ 4 = ?","a":"90","ch":["40","80","90","100"]},{"q":"Tens digit in 8,305?","a":"0","ch":["0","3","5","8"]},{"q":"Fraction = 0.25?","a":"1/4","ch":["1/4","1/3","1/2","2/5"]}]},"4":{"1":[{"q":"134 + 258 = ?","a":"392","ch":["382","392","402","412"]},{"q":"500 - 237 = ?","a":"263","ch":["253","263","273","283"]},{"q":"7 × 8 = ?","a":"56","ch":["48","54","56","64"]},{"q":"63 ÷ 9 = ?","a":"7","ch":["6","7","8","9"]},{"q":"1/4 of 100?","a":"25","ch":["10","20","25","50"]},{"q":"423 + 378 = ?","a":"801","ch":["791","801","811","821"]},{"q":"706 - 349 = ?","a":"357","ch":["347","357","367","377"]},{"q":"9 × 8 = ?","a":"72","ch":["63","70","72","81"]},{"q":"56 ÷ 7 = ?","a":"8","ch":["6","7","8","9"]},{"q":"3/4 of 100?","a":"75","ch":["25","50","75","100"]},{"q":"567 + 234 = ?","a":"801","ch":["791","801","811","821"]},{"q":"800 - 456 = ?","a":"344","ch":["334","344","354","364"]},{"q":"6 × 9 = ?","a":"54","ch":["45","48","54","63"]},{"q":"42 ÷ 6 = ?","a":"7","ch":["6","7","8","9"]},{"q":"50% of 80 = ?","a":"40","ch":["20","30","40","50"]},{"q":"345 + 567 = ?","a":"912","ch":["892","902","912","922"]},{"q":"900 - 378 = ?","a":"522","ch":["512","522","532","542"]},{"q":"7 × 6 = ?","a":"42","ch":["36","40","42","48"]},{"q":"72 ÷ 8 = ?","a":"9","ch":["7","8","9","10"]},{"q":"25% of 80 = ?","a":"20","ch":["10","15","20","25"]},{"q":"678 + 123 = ?","a":"801","ch":["791","801","811","821"]},{"q":"1000 - 542 = ?","a":"458","ch":["448","458","468","478"]},{"q":"8 × 7 = ?","a":"56","ch":["42","49","56","63"]},{"q":"54 ÷ 6 = ?","a":"9","ch":["7","8","9","10"]},{"q":"10% of 70 = ?","a":"7","ch":["5","7","10","70"]},{"q":"487 + 316 = ?","a":"803","ch":["793","803","813","823"]},{"q":"750 - 325 = ?","a":"425","ch":["415","425","435","445"]},{"q":"9 × 7 = ?","a":"63","ch":["54","56","63","72"]},{"q":"81 ÷ 9 = ?","a":"9","ch":["7","8","9","10"]},{"q":"20% of 50 = ?","a":"10","ch":["5","10","15","20"]}],"2":[{"q":"Area: rectangle 8×6 = ?","a":"48","ch":["28","42","48","56"]},{"q":"Perimeter: rectangle 8×6 = ?","a":"28","ch":["14","24","28","48"]},{"q":"2/3 of 12 = ?","a":"8","ch":["4","6","8","10"]},{"q":"Area: square side=7 = ?","a":"49","ch":["14","28","42","49"]},{"q":"Perimeter: square side=9 = ?","a":"36","ch":["18","27","36","81"]},{"q":"1/5 of 25 = ?","a":"5","ch":["3","4","5","6"]},{"q":"Area: rectangle 9×4 = ?","a":"36","ch":["26","32","36","42"]},{"q":"Perimeter: triangle 6+8+10 = ?","a":"24","ch":["18","22","24","28"]},{"q":"3/5 of 20 = ?","a":"12","ch":["8","10","12","15"]},{"q":"Area: square side=6 = ?","a":"36","ch":["12","24","30","36"]},{"q":"Perimeter: rectangle 12×5 = ?","a":"34","ch":["17","30","34","60"]},{"q":"2/5 of 30 = ?","a":"12","ch":["6","10","12","15"]},{"q":"Area: rectangle 11×3 = ?","a":"33","ch":["28","30","33","36"]},{"q":"Perimeter: square side=10 = ?","a":"40","ch":["20","30","40","100"]},{"q":"4/5 of 25 = ?","a":"20","ch":["10","15","20","25"]},{"q":"Area: rectangle 7×7 = ?","a":"49","ch":["28","42","49","56"]},{"q":"Perimeter: rectangle 15×4 = ?","a":"38","ch":["19","30","38","60"]},{"q":"1/6 of 24 = ?","a":"4","ch":["3","4","5","6"]},{"q":"Area: square side=8 = ?","a":"64","ch":["16","32","48","64"]},{"q":"Perimeter: triangle 7+9+5 = ?","a":"21","ch":["17","19","21","23"]},{"q":"3/4 of 16 = ?","a":"12","ch":["4","8","12","16"]},{"q":"Area: rectangle 10×6 = ?","a":"60","ch":["30","40","60","80"]},{"q":"Perimeter: square side=11 = ?","a":"44","ch":["22","33","44","121"]},{"q":"5/6 of 12 = ?","a":"10","ch":["6","8","10","12"]},{"q":"Area: rectangle 5×9 = ?","a":"45","ch":["28","36","45","54"]},{"q":"Perimeter: triangle 4+5+6 = ?","a":"15","ch":["11","13","15","20"]},{"q":"2/3 of 18 = ?","a":"12","ch":["6","9","12","15"]},{"q":"Area: square side=5 = ?","a":"25","ch":["10","20","25","30"]},{"q":"Perimeter: rectangle 7×3 = ?","a":"20","ch":["10","14","20","21"]},{"q":"3/8 of 24 = ?","a":"9","ch":["6","8","9","12"]}],"3":[{"q":"1,000 + 1,000 = ?","a":"2,000","ch":["200","2,000","20,000","200,000"]},{"q":"Round 4,567 to nearest 1,000","a":"5,000","ch":["4,000","4,500","5,000","6,000"]},{"q":"1,234 + 2,345 = ?","a":"3,579","ch":["3,479","3,569","3,579","3,689"]},{"q":"5,000 - 2,345 = ?","a":"2,655","ch":["2,545","2,645","2,655","2,765"]},{"q":"10 × 100 = ?","a":"1,000","ch":["100","1,000","10,000","100,000"]},{"q":"Round 7,834 to nearest 100","a":"7,800","ch":["7,800","7,830","7,840","7,900"]},{"q":"2,468 + 1,357 = ?","a":"3,825","ch":["3,715","3,815","3,825","3,925"]},{"q":"8,000 - 3,456 = ?","a":"4,544","ch":["4,434","4,534","4,544","4,654"]},{"q":"100 × 100 = ?","a":"10,000","ch":["1,000","10,000","100,000","1,000,000"]},{"q":"Round 3,450 to nearest 1,000","a":"3,000","ch":["3,000","3,400","3,500","4,000"]},{"q":"3,789 + 2,456 = ?","a":"6,245","ch":["6,145","6,235","6,245","6,355"]},{"q":"9,000 - 4,567 = ?","a":"4,433","ch":["4,333","4,423","4,433","4,543"]},{"q":"50 × 20 = ?","a":"1,000","ch":["100","500","1,000","10,000"]},{"q":"Round 6,555 to nearest 1,000","a":"7,000","ch":["6,000","6,500","7,000","8,000"]},{"q":"4,321 + 3,456 = ?","a":"7,777","ch":["7,667","7,767","7,777","7,887"]},{"q":"10,000 - 3,456 = ?","a":"6,544","ch":["6,444","6,534","6,544","6,644"]},{"q":"25 × 40 = ?","a":"1,000","ch":["100","500","1,000","5,000"]},{"q":"Round 9,349 to nearest 1,000","a":"9,000","ch":["9,000","9,300","9,400","10,000"]},{"q":"5,678 + 2,345 = ?","a":"8,023","ch":["7,913","8,013","8,023","8,133"]},{"q":"7,000 - 2,768 = ?","a":"4,232","ch":["4,132","4,222","4,232","4,342"]},{"q":"200 × 50 = ?","a":"10,000","ch":["1,000","5,000","10,000","100,000"]},{"q":"Ten-thousands digit in 4,582?","a":"0","ch":["0","4","5","8"]},{"q":"6,789 + 1,234 = ?","a":"8,023","ch":["7,913","8,013","8,023","8,133"]},{"q":"6,000 - 4,321 = ?","a":"1,679","ch":["1,569","1,659","1,679","1,769"]},{"q":"400 × 25 = ?","a":"10,000","ch":["1,000","4,000","10,000","40,000"]},{"q":"Round 14,500 to nearest 10,000","a":"10,000","ch":["10,000","14,000","15,000","20,000"]},{"q":"7,654 + 2,347 = ?","a":"10,001","ch":["9,891","9,991","10,001","10,101"]},{"q":"8,500 - 3,750 = ?","a":"4,750","ch":["4,650","4,750","4,850","5,750"]},{"q":"500 × 20 = ?","a":"10,000","ch":["1,000","5,000","10,000","100,000"]},{"q":"3 ten-thousands, 2 thousands, 4 hundreds?","a":"32,400","ch":["3,240","32,400","324,000","3,240,000"]}],"4":[{"q":"4 a factor of 20?","a":"Yes","ch":["Yes","No","Sometimes","Depends"]},{"q":"Factors of 12: total count?","a":"6","ch":["4","5","6","7"]},{"q":"GCF of 8 and 12?","a":"4","ch":["2","3","4","6"]},{"q":"36 a multiple of 9?","a":"Yes","ch":["Yes","No","Sometimes","Depends"]},{"q":"7 prime or composite?","a":"Prime","ch":["Prime","Composite","Neither","Both"]},{"q":"GCF of 6 and 9?","a":"3","ch":["1","2","3","6"]},{"q":"15 prime or composite?","a":"Composite","ch":["Prime","Composite","Neither","Both"]},{"q":"NOT a factor of 8?","a":"3","ch":["1","2","3","4"]},{"q":"LCM of 4 and 6?","a":"12","ch":["2","8","12","24"]},{"q":"11 prime or composite?","a":"Prime","ch":["Prime","Composite","Both","Neither"]},{"q":"GCF of 10 and 15?","a":"5","ch":["2","3","5","10"]},{"q":"49 a perfect square?","a":"Yes","ch":["Yes","No","Sometimes","Only if even"]},{"q":"LCM of 3 and 5?","a":"15","ch":["3","5","15","30"]},{"q":"2 prime or composite?","a":"Prime","ch":["Prime","Composite","Neither","Both"]},{"q":"GCF of 16 and 24?","a":"8","ch":["2","4","8","16"]},{"q":"Factors of 1: total?","a":"1","ch":["0","1","2","3"]},{"q":"LCM of 4 and 5?","a":"20","ch":["1","9","20","40"]},{"q":"9 prime or composite?","a":"Composite","ch":["Prime","Composite","Neither","Both"]},{"q":"GCF of 12 and 18?","a":"6","ch":["2","3","6","12"]},{"q":"25 a perfect square?","a":"Yes","ch":["Yes","No","Only sometimes","Never"]},{"q":"LCM of 6 and 8?","a":"24","ch":["2","14","24","48"]},{"q":"Prime numbers less than 10?","a":"4","ch":["3","4","5","6"]},{"q":"GCF of 20 and 30?","a":"10","ch":["2","5","10","20"]},{"q":"4 prime or composite?","a":"Composite","ch":["Prime","Composite","Neither","Both"]},{"q":"LCM of 2 and 7?","a":"14","ch":["2","7","9","14"]},{"q":"64 a perfect square?","a":"Yes","ch":["Yes","No","Sometimes","Never"]},{"q":"GCF of 15 and 25?","a":"5","ch":["1","3","5","15"]},{"q":"1 prime or composite?","a":"Neither","ch":["Prime","Composite","Neither","Both"]},{"q":"LCM of 5 and 6?","a":"30","ch":["1","11","30","60"]},{"q":"GCF of 14 and 21?","a":"7","ch":["1","3","7","14"]}],"5":[{"q":"0.3 + 0.5 = ?","a":"0.8","ch":["0.08","0.35","0.8","0.85"]},{"q":"0.7 - 0.2 = ?","a":"0.5","ch":["0.5","0.9","1.9","5.0"]},{"q":"0.4 × 2 = ?","a":"0.8","ch":["0.08","0.48","0.8","8.0"]},{"q":"1.2 + 0.8 = ?","a":"2.0","ch":["1.8","2.0","2.8","12.8"]},{"q":"0.3 vs 0.30?","a":"Equal","ch":["0.3","0.30","Equal","Cannot tell"]},{"q":"0.6 × 3 = ?","a":"1.8","ch":["0.18","1.8","18","180"]},{"q":"2.5 - 1.3 = ?","a":"1.2","ch":["1.0","1.2","1.4","3.8"]},{"q":"0.6 vs 0.59: which greater?","a":"0.6","ch":["0.59","0.6","Equal","Cannot tell"]},{"q":"0.9 + 0.4 = ?","a":"1.3","ch":["0.13","1.3","1.5","13.0"]},{"q":"3.7 - 2.4 = ?","a":"1.3","ch":["1.1","1.2","1.3","1.4"]},{"q":"0.5 × 4 = ?","a":"2.0","ch":["0.20","2.0","20","200"]},{"q":"1.8 + 0.7 = ?","a":"2.5","ch":["1.5","2.5","2.75","25.0"]},{"q":"0.45 vs 0.5: which less?","a":"0.45","ch":["0.45","0.5","Equal","Cannot tell"]},{"q":"0.8 × 5 = ?","a":"4.0","ch":["0.40","4.0","40","400"]},{"q":"4.6 - 2.3 = ?","a":"2.3","ch":["2.1","2.3","2.9","6.9"]},{"q":"0.25 + 0.25 = ?","a":"0.5","ch":["0.025","0.05","0.5","5.0"]},{"q":"1.05 vs 1.5: which greater?","a":"1.5","ch":["1.05","1.5","Equal","Cannot tell"]},{"q":"0.3 × 6 = ?","a":"1.8","ch":["0.18","1.8","18","180"]},{"q":"5.8 - 3.4 = ?","a":"2.4","ch":["2.2","2.4","2.6","9.2"]},{"q":"0.75 + 0.25 = ?","a":"1.0","ch":["0.1","0.5","1.0","10.0"]},{"q":"0.8 vs 0.79: which less?","a":"0.79","ch":["0.79","0.8","Equal","Cannot tell"]},{"q":"0.7 × 7 = ?","a":"4.9","ch":["0.49","4.9","49","490"]},{"q":"3.4 + 2.8 = ?","a":"6.2","ch":["5.2","6.0","6.2","6.4"]},{"q":"9.0 - 4.5 = ?","a":"4.5","ch":["4.0","4.5","5.0","5.5"]},{"q":"0.04 vs 0.1: which greater?","a":"0.1","ch":["0.04","0.1","Equal","Cannot tell"]},{"q":"0.9 × 9 = ?","a":"8.1","ch":["0.81","8.1","81","810"]},{"q":"7.3 - 5.8 = ?","a":"1.5","ch":["1.3","1.4","1.5","2.5"]},{"q":"0.6+0.6+0.6 = ?","a":"1.8","ch":["0.18","1.8","18","1.6"]},{"q":"0.3 vs 0.03: which less?","a":"0.03","ch":["0.03","0.3","Equal","Cannot tell"]},{"q":"1.5 × 4 = ?","a":"6.0","ch":["0.6","6.0","60","600"]}]},"5":{"1":[{"q":"2/3 + 1/6 = ?","a":"5/6","ch":["1/2","5/6","7/9","1"]},{"q":"3/4 - 1/8 = ?","a":"5/8","ch":["2/4","5/8","2/8","7/8"]},{"q":"1/2 × 4 = ?","a":"2","ch":["1","2","4","8"]},{"q":"3/4 ÷ 3 = ?","a":"1/4","ch":["1/4","3/12","9/4","4/3"]},{"q":"5/6 - 1/3 = ?","a":"1/2","ch":["1/3","1/2","2/3","4/6"]},{"q":"2/5 + 3/10 = ?","a":"7/10","ch":["5/15","7/10","1/2","5/10"]},{"q":"2/3 × 3 = ?","a":"2","ch":["1","2","3","6"]},{"q":"4/5 ÷ 4 = ?","a":"1/5","ch":["1/5","4/20","16/5","5/4"]},{"q":"7/8 - 3/8 = ?","a":"1/2","ch":["4/8","1/2","3/8","4/0"]},{"q":"1/3 + 5/9 = ?","a":"8/9","ch":["6/9","7/9","8/9","1"]},{"q":"3/5 × 5 = ?","a":"3","ch":["1","3","5","15"]},{"q":"5/6 ÷ 5 = ?","a":"1/6","ch":["1/6","5/30","1/30","25/6"]},{"q":"1/4 + 5/8 = ?","a":"7/8","ch":["6/8","7/8","6/12","1"]},{"q":"9/10 - 2/5 = ?","a":"1/2","ch":["7/10","1/2","5/10","7/5"]},{"q":"3/4 × 4 = ?","a":"3","ch":["1","3","4","12"]},{"q":"2/3 ÷ 2 = ?","a":"1/3","ch":["1/3","2/6","4/3","1/6"]},{"q":"5/12 + 1/4 = ?","a":"2/3","ch":["6/16","2/3","6/12","1/2"]},{"q":"4/5 - 3/10 = ?","a":"1/2","ch":["1/10","1/2","7/10","1/5"]},{"q":"5/8 × 8 = ?","a":"5","ch":["1","5","8","40"]},{"q":"3/8 ÷ 3 = ?","a":"1/8","ch":["1/8","3/24","9/8","1/3"]},{"q":"2/7 + 3/14 = ?","a":"1/2","ch":["5/21","7/14","1/2","5/14"]},{"q":"5/6 - 2/9 = ?","a":"11/18","ch":["3/3","11/18","1/2","7/15"]},{"q":"7/8 × 8 = ?","a":"7","ch":["1","7","8","56"]},{"q":"4/9 ÷ 4 = ?","a":"1/9","ch":["1/9","4/36","16/9","9/4"]},{"q":"3/10 + 2/5 = ?","a":"7/10","ch":["5/15","7/10","1/2","5/50"]},{"q":"11/12 - 1/4 = ?","a":"2/3","ch":["10/8","2/3","10/12","3/4"]},{"q":"2/5 × 5 = ?","a":"2","ch":["1","2","5","10"]},{"q":"5/7 ÷ 5 = ?","a":"1/7","ch":["1/7","5/35","1/35","25/7"]},{"q":"1/6 + 5/12 = ?","a":"7/12","ch":["6/18","7/12","2/3","1/2"]},{"q":"7/9 - 1/3 = ?","a":"4/9","ch":["6/6","4/9","6/9","2/3"]}],"2":[{"q":"0.4 × 0.2 = ?","a":"0.08","ch":["0.08","0.8","8","0.6"]},{"q":"1.5 × 1.5 = ?","a":"2.25","ch":["1.5","2.25","3.0","3.25"]},{"q":"0.6 ÷ 0.3 = ?","a":"2","ch":["0.2","0.9","2","20"]},{"q":"3.6 ÷ 0.9 = ?","a":"4","ch":["3","4","0.4","40"]},{"q":"0.7 × 0.7 = ?","a":"0.49","ch":["0.14","0.49","1.4","4.9"]},{"q":"2.4 ÷ 0.6 = ?","a":"4","ch":["0.4","4","40","0.04"]},{"q":"0.3 × 0.9 = ?","a":"0.27","ch":["0.27","0.12","2.7","0.039"]},{"q":"5.6 ÷ 0.8 = ?","a":"7","ch":["0.7","7","70","0.07"]},{"q":"1.2 × 0.5 = ?","a":"0.6","ch":["0.06","0.6","6","60"]},{"q":"4.5 ÷ 0.5 = ?","a":"9","ch":["0.9","9","90","0.09"]},{"q":"0.8 × 0.8 = ?","a":"0.64","ch":["0.16","0.64","6.4","16"]},{"q":"7.2 ÷ 0.9 = ?","a":"8","ch":["0.8","8","80","0.08"]},{"q":"2.5 × 0.4 = ?","a":"1.0","ch":["0.1","0.10","1.0","10"]},{"q":"3.6 ÷ 0.4 = ?","a":"9","ch":["0.9","9","90","0.09"]},{"q":"0.9 × 0.6 = ?","a":"0.54","ch":["0.15","0.54","5.4","15"]},{"q":"8.1 ÷ 0.9 = ?","a":"9","ch":["0.9","9","90","81"]},{"q":"1.4 × 0.5 = ?","a":"0.7","ch":["0.07","0.7","7","70"]},{"q":"6.4 ÷ 0.8 = ?","a":"8","ch":["0.8","8","80","0.08"]},{"q":"0.5 × 0.5 = ?","a":"0.25","ch":["0.25","2.5","0.1","0.025"]},{"q":"1.6 ÷ 0.4 = ?","a":"4","ch":["0.4","4","40","0.04"]},{"q":"2.3 × 0.3 = ?","a":"0.69","ch":["0.069","0.69","6.9","69"]},{"q":"9.0 ÷ 0.6 = ?","a":"15","ch":["1.5","15","150","0.15"]},{"q":"0.4 × 0.4 = ?","a":"0.16","ch":["0.08","0.16","1.6","8"]},{"q":"4.8 ÷ 0.6 = ?","a":"8","ch":["0.8","8","80","0.08"]},{"q":"1.8 × 0.5 = ?","a":"0.9","ch":["0.09","0.9","9","90"]},{"q":"7.5 ÷ 0.5 = ?","a":"15","ch":["1.5","15","150","0.15"]},{"q":"0.6 × 0.6 = ?","a":"0.36","ch":["0.12","0.36","3.6","12"]},{"q":"2.7 ÷ 0.9 = ?","a":"3","ch":["0.3","3","30","0.03"]},{"q":"3.5 × 0.2 = ?","a":"0.7","ch":["0.07","0.7","7","70"]},{"q":"5.4 ÷ 0.6 = ?","a":"9","ch":["0.9","9","90","0.09"]}],"3":[{"q":"30% of 90 = ?","a":"27","ch":["9","18","27","36"]},{"q":"60% of 50 = ?","a":"30","ch":["20","25","30","35"]},{"q":"Ratio 2:5 = ?:20","a":"8","ch":["4","8","10","12"]},{"q":"15% of 40 = ?","a":"6","ch":["4","6","8","10"]},{"q":"Ratio 3:4 = 9:?","a":"12","ch":["3","9","12","16"]},{"q":"45% of 20 = ?","a":"9","ch":["6","9","10","12"]},{"q":"5 items for $2.50, cost each?","a":"$0.50","ch":["$0.25","$0.50","$0.75","$1.00"]},{"q":"80% of 35 = ?","a":"28","ch":["20","24","28","35"]},{"q":"Ratio 1:3 = 4:?","a":"12","ch":["3","4","12","16"]},{"q":"25% of 64 = ?","a":"16","ch":["8","12","16","32"]},{"q":"60 miles in 3 hours = ? mph","a":"20","ch":["15","20","25","30"]},{"q":"70% of 60 = ?","a":"42","ch":["30","36","42","48"]},{"q":"Ratio 5:2 = 25:?","a":"10","ch":["5","10","15","20"]},{"q":"40% of 75 = ?","a":"30","ch":["15","25","30","45"]},{"q":"12 apples for $3, each?","a":"$0.25","ch":["$0.10","$0.25","$0.30","$0.50"]},{"q":"55% of 20 = ?","a":"11","ch":["8","10","11","14"]},{"q":"Ratio 4:7 = 8:?","a":"14","ch":["4","11","14","28"]},{"q":"35% of 80 = ?","a":"28","ch":["20","28","35","40"]},{"q":"90 words in 3 min = ? wpm","a":"30","ch":["20","25","30","45"]},{"q":"65% of 40 = ?","a":"26","ch":["20","26","30","35"]},{"q":"Ratio 2:3 = 14:?","a":"21","ch":["7","14","21","28"]},{"q":"20% of 85 = ?","a":"17","ch":["12","15","17","20"]},{"q":"$24 for 8 books = ?/book","a":"$3.00","ch":["$2.00","$3.00","$4.00","$6.00"]},{"q":"75% of 48 = ?","a":"36","ch":["12","24","36","40"]},{"q":"Ratio 3:8 = 12:?","a":"32","ch":["12","24","32","40"]},{"q":"10% of 230 = ?","a":"23","ch":["2.3","23","230","2300"]},{"q":"144 km in 4 hr = ? kph","a":"36","ch":["24","36","48","144"]},{"q":"90% of 70 = ?","a":"63","ch":["54","63","70","77"]},{"q":"Ratio 6:1 = 30:?","a":"5","ch":["1","5","6","30"]},{"q":"5% of 200 = ?","a":"10","ch":["5","10","20","40"]}],"4":[{"q":"Volume: cube side=3 cm","a":"27","ch":["9","18","27","81"]},{"q":"Surface area: cube side=2 cm","a":"24","ch":["4","12","24","48"]},{"q":"Volume: prism 4×3×2","a":"24","ch":["9","18","24","48"]},{"q":"3D shape with 6 faces?","a":"Cube","ch":["Cube","Sphere","Cone","Pyramid"]},{"q":"Volume: cube side=4 cm","a":"64","ch":["16","48","64","256"]},{"q":"Surface area: prism 2×3×4","a":"52","ch":["24","48","52","96"]},{"q":"Volume: prism 5×2×3","a":"30","ch":["10","25","30","60"]},{"q":"Vertices of a cube?","a":"8","ch":["4","6","8","12"]},{"q":"Volume: cube side=5 cm","a":"125","ch":["25","75","100","125"]},{"q":"Edges of a cube?","a":"12","ch":["6","8","10","12"]},{"q":"Volume: prism 6×4×3","a":"72","ch":["13","48","72","144"]},{"q":"3D shape with no edges?","a":"Sphere","ch":["Cube","Sphere","Cone","Cylinder"]},{"q":"Volume: cube side=6 cm","a":"216","ch":["36","108","216","256"]},{"q":"Surface area: cube side=4 cm","a":"96","ch":["16","64","96","192"]},{"q":"Volume: prism 7×2×4","a":"56","ch":["13","42","56","112"]},{"q":"Faces of a triangular prism?","a":"5","ch":["3","4","5","6"]},{"q":"Volume: cube side=2 cm","a":"8","ch":["4","6","8","12"]},{"q":"Surface area: cube side=3 cm","a":"54","ch":["9","27","54","81"]},{"q":"Volume: prism 8×3×2","a":"48","ch":["13","24","48","96"]},{"q":"Faces of a cone?","a":"2","ch":["1","2","3","4"]},{"q":"Volume: cube side=7 cm","a":"343","ch":["49","147","343","441"]},{"q":"Surface area: cube side=5 cm","a":"150","ch":["25","75","125","150"]},{"q":"Volume: prism 9×2×1","a":"18","ch":["9","12","18","162"]},{"q":"Vertices of a square pyramid?","a":"5","ch":["4","5","6","8"]},{"q":"Volume: cube side=1 cm","a":"1","ch":["1","3","6","8"]},{"q":"Surface area: cube side=6 cm","a":"216","ch":["36","108","216","256"]},{"q":"Volume: prism 10×2×3","a":"60","ch":["15","30","60","150"]},{"q":"Edges of a triangular prism?","a":"9","ch":["6","8","9","12"]},{"q":"Volume: cube side=10 cm","a":"1000","ch":["100","300","1000","10000"]},{"q":"Surface area: cube side=7 cm","a":"294","ch":["49","196","294","343"]}],"5":[{"q":"Quadrant with (+,+)?","a":"I","ch":["I","II","III","IV"]},{"q":"(3, -2) is in which quadrant?","a":"IV","ch":["I","II","III","IV"]},{"q":"x-coordinate of (5, 3)?","a":"5","ch":["3","5","8","15"]},{"q":"(-2, -3) is in which quadrant?","a":"III","ch":["I","II","III","IV"]},{"q":"Translate (2,3) right 4: new x?","a":"6","ch":["2","4","6","8"]},{"q":"y-coordinate of (4, -1)?","a":"-1","ch":["-4","1","-1","4"]},{"q":"Quadrant with (-, +)?","a":"II","ch":["I","II","III","IV"]},{"q":"Reflect (3,2) over y-axis: new x?","a":"-3","ch":["-3","-2","2","3"]},{"q":"The origin is at?","a":"(0,0)","ch":["(0,0)","(1,1)","(0,1)","(1,0)"]},{"q":"(-4, 5) is in which quadrant?","a":"II","ch":["I","II","III","IV"]},{"q":"Translate (1,1) up 3: new y?","a":"4","ch":["1","3","4","6"]},{"q":"The x-axis is?","a":"Horizontal","ch":["Vertical","Horizontal","Diagonal","Circular"]},{"q":"Reflect (2,-4) over x-axis: new y?","a":"4","ch":["-4","-2","2","4"]},{"q":"(0, -3) is on which axis?","a":"y-axis","ch":["x-axis","y-axis","Origin","Neither"]},{"q":"Distance (0,0) to (3,0) = ?","a":"3","ch":["0","1","3","9"]},{"q":"Translate (-1,4) down 5: new y?","a":"-1","ch":["-5","-1","4","9"]},{"q":"Quadrant with (+, -)?","a":"IV","ch":["I","II","III","IV"]},{"q":"Reflect (-3,-2) over origin?","a":"(3,2)","ch":["(3,2)","-3,2)","(3,-2)","(-3,-2)"]},{"q":"(4, 0) is on which axis?","a":"x-axis","ch":["x-axis","y-axis","Origin","Neither"]},{"q":"Translate (3,5) left 3: new x?","a":"0","ch":["0","3","6","8"]},{"q":"Distance (2,0) to (7,0) = ?","a":"5","ch":["5","9","14","35"]},{"q":"(-5, 7) x is negative means?","a":"Left of y-axis","ch":["Left of y-axis","Right of y-axis","Below x-axis","Above x-axis"]},{"q":"Reflect (6, 3) over x-axis: new y?","a":"-3","ch":["-6","-3","3","6"]},{"q":"(0, 0) is called?","a":"Origin","ch":["x-axis","y-axis","Origin","Quadrant I"]},{"q":"Translate (-2,-1) right 5: new x?","a":"3","ch":["-7","-2","3","5"]},{"q":"Distance (0,0) to (0,4) = ?","a":"4","ch":["0","1","4","16"]},{"q":"Which axis is vertical?","a":"y-axis","ch":["x-axis","y-axis","z-axis","None"]},{"q":"Reflect (1,5) over y-axis?","a":"(-1,5)","ch":["(-1,5)","(1,-5)","(-1,-5)","(5,1)"]},{"q":"(-3, 0) is on?","a":"x-axis","ch":["x-axis","y-axis","Origin","Quadrant II"]},{"q":"Translate (4,6) by (-2,-3)?","a":"(2,3)","ch":["(2,3)","(6,9)","(-2,-3)","(2,9)"]}]},"6":{"1":[{"q":"7 × 8 = ?","a":"56","ch":["48","54","56","58"]},{"q":"3x = 21, x = ?","a":"7","ch":["5","6","7","9"]},{"q":"25% of 80 = ?","a":"20","ch":["15","20","25","40"]},{"q":"√64 = ?","a":"8","ch":["6","7","8","9"]},{"q":"12² = ?","a":"144","ch":["122","132","144","154"]},{"q":"3/4 + 1/4 = ?","a":"1","ch":["0.5","0.75","1","1.5"]},{"q":"a=5: 3a+2 = ?","a":"17","ch":["13","15","17","20"]},{"q":"15% of 60 = ?","a":"9","ch":["6","9","12","15"]},{"q":"Simplify 18/24","a":"3/4","ch":["1/2","2/3","3/4","5/6"]},{"q":"Area: square side=9","a":"81","ch":["36","72","81","90"]},{"q":"9 × 7 = ?","a":"63","ch":["54","56","63","72"]},{"q":"4x = 28, x = ?","a":"7","ch":["5","6","7","8"]},{"q":"50% of 46 = ?","a":"23","ch":["18","20","23","26"]},{"q":"√81 = ?","a":"9","ch":["7","8","9","10"]},{"q":"11² = ?","a":"121","ch":["111","121","131","141"]},{"q":"1/3 + 1/3 = ?","a":"2/3","ch":["1/3","2/3","3/4","1"]},{"q":"b=4: 5b-3 = ?","a":"17","ch":["15","17","19","21"]},{"q":"20% of 90 = ?","a":"18","ch":["14","16","18","20"]},{"q":"Simplify 20/30","a":"2/3","ch":["1/2","2/3","3/4","4/5"]},{"q":"Perimeter: square s=7","a":"28","ch":["14","21","28","49"]},{"q":"6 × 9 = ?","a":"54","ch":["45","48","54","56"]},{"q":"2x+4=12, x = ?","a":"4","ch":["2","3","4","6"]},{"q":"75% of 40 = ?","a":"30","ch":["25","28","30","35"]},{"q":"√100 = ?","a":"10","ch":["8","9","10","11"]},{"q":"8² = ?","a":"64","ch":["48","56","64","72"]},{"q":"2/5 + 1/5 = ?","a":"3/5","ch":["1/5","2/5","3/5","4/5"]},{"q":"c=3: 4c+5 = ?","a":"17","ch":["12","14","17","20"]},{"q":"10% of 350 = ?","a":"35","ch":["25","30","35","40"]},{"q":"Simplify 15/25","a":"3/5","ch":["2/5","3/5","4/5","3/4"]},{"q":"Volume: cube side=3","a":"27","ch":["9","18","27","36"]}],"2":[{"q":"3x=18, x = ?","a":"6","ch":["4","5","6","8"]},{"q":"x+7=15, x = ?","a":"8","ch":["6","7","8","9"]},{"q":"2x+1=11, x = ?","a":"5","ch":["4","5","6","7"]},{"q":"Simplify 8/12","a":"2/3","ch":["1/2","2/3","3/4","4/5"]},{"q":"3/5 + 1/5 = ?","a":"4/5","ch":["2/5","3/5","4/5","1"]},{"q":"7/8 - 3/8 = ?","a":"1/2","ch":["1/4","1/2","3/4","4/8"]},{"q":"30% of 50 = ?","a":"15","ch":["10","12","15","20"]},{"q":"4x=32, x = ?","a":"8","ch":["6","7","8","9"]},{"q":"15% of 80 = ?","a":"12","ch":["8","10","12","16"]},{"q":"0.5 as fraction = ?","a":"1/2","ch":["1/3","1/2","2/3","3/4"]},{"q":"5x-3=17, x = ?","a":"4","ch":["3","4","5","6"]},{"q":"Simplify 15/20","a":"3/4","ch":["1/2","2/3","3/4","4/5"]},{"q":"1/4 + 2/4 = ?","a":"3/4","ch":["1/2","3/4","1","5/4"]},{"q":"40% of 70 = ?","a":"28","ch":["20","24","28","35"]},{"q":"0.25 as % = ?","a":"25%","ch":["20%","25%","30%","35%"]},{"q":"x-9=14, x = ?","a":"23","ch":["5","14","19","23"]},{"q":"Simplify 12/18","a":"2/3","ch":["1/2","2/3","3/4","2/4"]},{"q":"5/6 - 1/6 = ?","a":"2/3","ch":["1/3","2/3","4/6","5/6"]},{"q":"60% of 45 = ?","a":"27","ch":["20","25","27","30"]},{"q":"3/4 as decimal = ?","a":"0.75","ch":["0.5","0.6","0.75","0.8"]},{"q":"2x+5=19, x = ?","a":"7","ch":["5","6","7","8"]},{"q":"Simplify 16/24","a":"2/3","ch":["1/2","2/3","3/4","1/3"]},{"q":"2/3 + 1/6 = ?","a":"5/6","ch":["3/9","1/2","5/6","3/6"]},{"q":"35% of 40 = ?","a":"14","ch":["10","12","14","16"]},{"q":"0.8 as fraction = ?","a":"4/5","ch":["3/4","4/5","5/6","1/8"]},{"q":"3x-6=12, x = ?","a":"6","ch":["4","5","6","7"]},{"q":"Simplify 9/15","a":"3/5","ch":["2/5","3/5","4/5","1/3"]},{"q":"3/8 + 1/4 = ?","a":"5/8","ch":["4/8","5/8","6/8","7/8"]},{"q":"45% of 20 = ?","a":"9","ch":["6","8","9","10"]},{"q":"1/5 as decimal = ?","a":"0.2","ch":["0.1","0.2","0.5","0.15"]}],"3":[{"q":"√64 = ?","a":"8","ch":["6","7","8","9"]},{"q":"12² = ?","a":"144","ch":["124","132","144","156"]},{"q":"3/4 + 1/4 = ?","a":"1","ch":["3/4","1","5/4","2"]},{"q":"a=5: 3a+2 = ?","a":"17","ch":["13","15","17","20"]},{"q":"Area triangle b=8, h=6","a":"24","ch":["14","24","48","96"]},{"q":"Perimeter 5+6+7 = ?","a":"18","ch":["14","16","18","20"]},{"q":"15% of 60 = ?","a":"9","ch":["6","8","9","12"]},{"q":"10² = ?","a":"100","ch":["20","50","100","200"]},{"q":"√81 = ?","a":"9","ch":["7","8","9","10"]},{"q":"b=3: 4b² = ?","a":"36","ch":["24","30","36","48"]},{"q":"2/5 as % = ?","a":"40%","ch":["25%","35%","40%","45%"]},{"q":"Area triangle b=10, h=4","a":"20","ch":["14","20","40","80"]},{"q":"7² = ?","a":"49","ch":["21","42","49","56"]},{"q":"√121 = ?","a":"11","ch":["9","10","11","12"]},{"q":"c=4: 2c³ = ?","a":"128","ch":["32","64","96","128"]},{"q":"35% of 80 = ?","a":"28","ch":["20","24","28","35"]},{"q":"Volume cube side=3","a":"27","ch":["9","18","27","36"]},{"q":"9² = ?","a":"81","ch":["27","72","81","90"]},{"q":"√144 = ?","a":"12","ch":["10","11","12","13"]},{"q":"d=6: d²-10 = ?","a":"26","ch":["22","24","26","28"]},{"q":"Area parallelogram b=9, h=5","a":"45","ch":["14","28","40","45"]},{"q":"6² = ?","a":"36","ch":["12","24","36","48"]},{"q":"√169 = ?","a":"13","ch":["11","12","13","14"]},{"q":"e=2: 5e⁴ = ?","a":"80","ch":["40","60","80","100"]},{"q":"C=πd, d=10, π≈3.14","a":"31.4","ch":["15.7","31.4","62.8","100"]},{"q":"8² = ?","a":"64","ch":["48","56","64","72"]},{"q":"√196 = ?","a":"14","ch":["12","13","14","15"]},{"q":"f=7: f²+f = ?","a":"56","ch":["49","54","56","63"]},{"q":"Volume cube side=4","a":"64","ch":["16","32","48","64"]},{"q":"Area circle r=5, π≈3.14","a":"78.5","ch":["31.4","62.8","78.5","157"]}],"4":[{"q":"Mean of 2,4,6,8,10","a":"6","ch":["4","5","6","7"]},{"q":"Median of 3,7,2,9,5","a":"5","ch":["3","4","5","7"]},{"q":"Mode of 2,4,4,6,4,8","a":"4","ch":["2","4","6","8"]},{"q":"Range of 5,12,3,18,9","a":"15","ch":["9","13","15","18"]},{"q":"Mean of 10,20,30,40","a":"25","ch":["20","25","30","35"]},{"q":"Median of 1,3,5,7,9,11","a":"6","ch":["4","5","6","7"]},{"q":"Mode of 5,3,5,7,3,5","a":"5","ch":["3","5","7","6"]},{"q":"Range of 22,14,35,8,27","a":"27","ch":["14","22","27","35"]},{"q":"Mean of 15,25,35","a":"25","ch":["20","25","28","30"]},{"q":"P(1 of 4 outcomes)","a":"1/4","ch":["1/2","1/3","1/4","1/5"]},{"q":"P(3 of 5 outcomes)","a":"3/5","ch":["2/5","3/5","4/5","1/5"]},{"q":"3R,2B bag: P(red)","a":"3/5","ch":["2/5","3/5","1/2","2/3"]},{"q":"Median of 4,8,2,10,6","a":"6","ch":["4","5","6","8"]},{"q":"Mean of 6,8,10,12,14","a":"10","ch":["8","9","10","11"]},{"q":"Range of 100,45,72,18,63","a":"82","ch":["55","63","82","100"]},{"q":"Mode of 7,3,7,9,3,7,1","a":"7","ch":["1","3","7","9"]},{"q":"P(even) on die","a":"1/2","ch":["1/6","1/3","1/2","2/3"]},{"q":"P(rolling 6) on die","a":"1/6","ch":["1/2","1/4","1/6","1/3"]},{"q":"Mean of 9,3,6,12,15","a":"9","ch":["6","8","9","12"]},{"q":"Median of 2,2,5,8,8","a":"5","ch":["2","4","5","8"]},{"q":"2R,3G,5B bag: P(blue)","a":"1/2","ch":["1/5","1/3","1/2","3/5"]},{"q":"Mean of 0,2,4,6,8,10","a":"5","ch":["3","4","5","6"]},{"q":"Range of 33,17,29,42,8","a":"34","ch":["25","29","34","42"]},{"q":"Mode of 4,6,4,9,6,4,9","a":"4","ch":["4","6","9","none"]},{"q":"P(head) on coin","a":"1/2","ch":["1/4","1/3","1/2","2/3"]},{"q":"Median of 11,3,7,15,9","a":"9","ch":["7","8","9","11"]},{"q":"Mean of 5,10,15,20,25,30","a":"17.5","ch":["15","16","17.5","18"]},{"q":"P(vowel) in A,B,C,D,E","a":"2/5","ch":["1/5","2/5","1/2","3/5"]},{"q":"Range of 56,72,34,91,47","a":"57","ch":["34","47","57","91"]},{"q":"Mode of 1,1,2,2,3,3,3","a":"3","ch":["1","2","3","none"]}],"5":[{"q":"Ratio 3:12 simplified","a":"1:4","ch":["1:2","1:3","1:4","1:6"]},{"q":"2:3=8:?, ?=?","a":"12","ch":["9","10","12","16"]},{"q":"Scale 1:100, 5cm = ? m","a":"5m","ch":["1m","2m","5m","10m"]},{"q":"60 mi in 2 hr = ? mph","a":"30","ch":["20","25","30","35"]},{"q":"3/4=x/12, x=?","a":"9","ch":["6","8","9","10"]},{"q":"Ratio 15:25 simplified","a":"3:5","ch":["1:2","2:3","3:5","5:3"]},{"q":"5:8=10:?, ?=?","a":"16","ch":["12","14","16","20"]},{"q":"$24 for 8 items = $/item","a":"$3","ch":["$2","$3","$4","$6"]},{"q":"2/5=6/?, ?=?","a":"15","ch":["10","12","15","20"]},{"q":"Scale 1:50, 4cm = ? m","a":"2m","ch":["1m","2m","4m","8m"]},{"q":"Ratio 4:20 simplified","a":"1:5","ch":["1:4","1:5","2:5","4:5"]},{"q":"180 words in 3min = ? wpm","a":"60","ch":["40","50","60","90"]},{"q":"4/x=8/6, x=?","a":"3","ch":["2","3","4","6"]},{"q":"3:7=9:?, ?=?","a":"21","ch":["18","19","21","27"]},{"q":"Scale 2:1, model 6cm = ? cm","a":"3cm","ch":["1cm","2cm","3cm","6cm"]},{"q":"45 km in 3 hr = ? kph","a":"15","ch":["10","12","15","20"]},{"q":"3/4=9/?, ?=?","a":"12","ch":["8","10","12","16"]},{"q":"Ratio 18:24 simplified","a":"3:4","ch":["2:3","3:4","1:2","3:5"]},{"q":"$56 for 7 hr = ?/hr","a":"$8","ch":["$6","$7","$8","$9"]},{"q":"4:5=20:?, ?=?","a":"25","ch":["16","20","25","30"]},{"q":"Scale 1:200, 3cm = ? m","a":"6m","ch":["3m","5m","6m","10m"]},{"q":"x/6=4/8, x=?","a":"3","ch":["2","3","4","6"]},{"q":"Ratio 6:9:12 simplified","a":"2:3:4","ch":["1:2:3","2:3:4","3:4:5","6:9:12"]},{"q":"200 pages in 4 days = ?/day","a":"50","ch":["40","45","50","60"]},{"q":"5/8=15/?, ?=?","a":"24","ch":["16","20","24","30"]},{"q":"2:9=6:?, ?=?","a":"27","ch":["18","24","27","30"]},{"q":"Scale 1:500, 2cm = ? m","a":"10m","ch":["5m","8m","10m","15m"]},{"q":"90 beats in 1.5min = ? bpm","a":"60","ch":["45","55","60","90"]},{"q":"7/x=14/8, x=?","a":"4","ch":["2","4","6","7"]},{"q":"Ratio 24:36 simplified","a":"2:3","ch":["1:2","2:3","3:4","4:6"]}]},"7":{"1":[{"q":"2x+3=11, x=?","a":"4","ch":["3","4","5","7"]},{"q":"15% of 200=?","a":"30","ch":["20","25","30","40"]},{"q":"Expand 4(x+3)","a":"4x+12","ch":["4x+3","4x+7","4x+12","x+12"]},{"q":"-3×-7=?","a":"21","ch":["-21","-10","10","21"]},{"q":"2³=?","a":"8","ch":["4","6","8","16"]},{"q":"Area: l=8, w=5","a":"40","ch":["26","30","40","45"]},{"q":"x/4=7, x=?","a":"28","ch":["11","21","28","35"]},{"q":"Mean of 4,8,6,10,2","a":"6","ch":["5","6","7","8"]},{"q":"5x-10=15, x=?","a":"5","ch":["3","4","5","6"]},{"q":"(-2)⁴=?","a":"16","ch":["-16","-8","8","16"]},{"q":"3x-7=14, x=?","a":"7","ch":["5","6","7","9"]},{"q":"40% of 150=?","a":"60","ch":["45","55","60","70"]},{"q":"Expand 3(2x-5)","a":"6x-15","ch":["6x-5","6x-15","3x-15","5x-15"]},{"q":"-8×6=?","a":"-48","ch":["-56","-48","-42","48"]},{"q":"3⁴=?","a":"81","ch":["12","27","64","81"]},{"q":"Perimeter: l=9, w=4","a":"26","ch":["13","18","26","36"]},{"q":"x/3=9, x=?","a":"27","ch":["6","18","27","30"]},{"q":"Median of 3,9,1,7,5","a":"5","ch":["3","5","7","9"]},{"q":"4(x-2)=24, x=?","a":"8","ch":["4","6","8","10"]},{"q":"(-5)²=?","a":"25","ch":["-25","-10","10","25"]},{"q":"2⁵=?","a":"32","ch":["10","16","25","32"]},{"q":"60% of 80=?","a":"48","ch":["40","44","48","56"]},{"q":"Simplify 3(x+4)+2x","a":"5x+12","ch":["5x+4","5x+7","5x+12","5x+14"]},{"q":"-6×-8=?","a":"48","ch":["-48","-14","14","48"]},{"q":"4³=?","a":"64","ch":["12","16","48","64"]},{"q":"Area: b=12, h=7","a":"84","ch":["19","38","84","168"]},{"q":"3x+2x-4=16, x=?","a":"4","ch":["2","3","4","5"]},{"q":"Mode of 2,5,2,8,5,2","a":"2","ch":["2","5","8","none"]},{"q":"5(2x+1)=35, x=?","a":"3","ch":["1","2","3","4"]},{"q":"(-3)³=?","a":"-27","ch":["-27","-9","9","27"]}],"2":[{"q":"y=2x+1, x=3: y=?","a":"7","ch":["5","6","7","8"]},{"q":"Slope of y=3x-2?","a":"3","ch":["1","2","3","-2"]},{"q":"y-intercept of y=x+4?","a":"4","ch":["1","4","x","none"]},{"q":"2x-y=6, y=2: x=?","a":"4","ch":["2","3","4","5"]},{"q":"Is (2,5) on y=2x+1?","a":"Yes","ch":["Yes","No","Sometimes","Cannot tell"]},{"q":"Slope between (0,0)&(4,8)?","a":"2","ch":["0.5","1","2","4"]},{"q":"y=−x+3, x=2: y=?","a":"1","ch":["1","2","5","-1"]},{"q":"Parallel lines have equal?","a":"Slopes","ch":["y-intercepts","Slopes","x-values","Nothing"]},{"q":"x+2y=10, x=4: y=?","a":"3","ch":["2","3","4","6"]},{"q":"Slope of y=−4x+7?","a":"−4","ch":["4","7","−4","−7"]},{"q":"y=0.5x−1, x=6: y=?","a":"2","ch":["1","2","3","4"]},{"q":"Rise/run = 6/3: slope?","a":"2","ch":["0.5","1","2","3"]},{"q":"y=x: x=−3: y=?","a":"−3","ch":["−9","−3","3","9"]},{"q":"3x+y=9, x=2: y=?","a":"3","ch":["1","2","3","5"]},{"q":"y-intercept of y=5x?","a":"0","ch":["0","1","5","none"]},{"q":"Slope between (1,2)&(3,8)?","a":"3","ch":["2","3","4","6"]},{"q":"y=−2x+4, x=1: y=?","a":"2","ch":["2","4","6","−2"]},{"q":"Lines y=3x+1 & y=3x−2: relationship?","a":"Parallel","ch":["Parallel","Perpendicular","Intersecting","Same"]},{"q":"2x+3y=12, x=3: y=?","a":"2","ch":["2","3","4","6"]},{"q":"Slope of horizontal line?","a":"0","ch":["0","1","undefined","−1"]},{"q":"y=4x−3, x=2: y=?","a":"5","ch":["4","5","6","8"]},{"q":"Slope between (−1,2)&(3,6)?","a":"1","ch":["0.5","1","2","4"]},{"q":"y=−x+5, x=5: y=?","a":"0","ch":["0","5","10","−5"]},{"q":"Slope of vertical line?","a":"Undefined","ch":["0","1","Undefined","infinite"]},{"q":"x−y=3, y=−1: x=?","a":"2","ch":["1","2","4","-4"]},{"q":"y=2x: passes through origin?","a":"Yes","ch":["Yes","No","Sometimes","Cannot tell"]},{"q":"Slope between (0,4)&(2,0)?","a":"−2","ch":["2","−2","0.5","−0.5"]},{"q":"y=3x+2, x=−1: y=?","a":"−1","ch":["−1","1","5","−5"]},{"q":"4y=8x+12: slope?","a":"2","ch":["1","2","3","4"]},{"q":"y=x−7, x=7: y=?","a":"0","ch":["0","7","14","−7"]}],"3":[{"q":"x²+5x+6=(x+2)(x+?)","a":"3","ch":["1","2","3","6"]},{"q":"x²−9=(x+3)(x−?)","a":"3","ch":["1","2","3","9"]},{"q":"(x+4)²=x²+8x+?","a":"16","ch":["4","8","16","32"]},{"q":"Factor x²+7x+12","a":"(x+3)(x+4)","ch":["(x+2)(x+6)","(x+3)(x+4)","(x+1)(x+12)","(x+4)(x+4)"]},{"q":"x²−16: factored form?","a":"(x+4)(x−4)","ch":["(x+4)²","(x−4)²","(x+4)(x−4)","(x+2)(x−8)"]},{"q":"x²+2x−8=(x+4)(x−?)","a":"2","ch":["1","2","4","8"]},{"q":"(x+3)(x−3)=x²−?","a":"9","ch":["3","6","9","12"]},{"q":"Factor x²−5x+6","a":"(x−2)(x−3)","ch":["(x−1)(x−6)","(x−2)(x−3)","(x+2)(x+3)","(x−6)(x+1)"]},{"q":"x²+6x+9=(x+?)²","a":"3","ch":["2","3","6","9"]},{"q":"(2x+1)(x+3)=2x²+?x+3","a":"7","ch":["4","5","7","9"]},{"q":"Factor x²+10x+21","a":"(x+3)(x+7)","ch":["(x+3)(x+7)","(x+2)(x+9)","(x+1)(x+21)","(x+6)(x+5)"]},{"q":"x²−4x−12=(x−6)(x+?)","a":"2","ch":["1","2","3","4"]},{"q":"(x−5)²=x²−10x+?","a":"25","ch":["5","10","25","50"]},{"q":"Factor x²−x−6","a":"(x−3)(x+2)","ch":["(x−2)(x+3)","(x−3)(x+2)","(x−6)(x+1)","(x+6)(x−1)"]},{"q":"GCF of x³ and x⁵?","a":"x³","ch":["x","x²","x³","x⁵"]},{"q":"Factor 2x²+6x","a":"2x(x+3)","ch":["x(2x+6)","2x(x+3)","2(x²+3x)","x²(2+6)"]},{"q":"(x+1)(x+2)(x+3): degree?","a":"3","ch":["1","2","3","6"]},{"q":"x²−49=(x+?)(x−7)","a":"7","ch":["1","7","14","49"]},{"q":"Factor x²+11x+30","a":"(x+5)(x+6)","ch":["(x+3)(x+10)","(x+5)(x+6)","(x+2)(x+15)","(x+6)(x+6)"]},{"q":"(x+y)²=x²+2xy+?","a":"y²","ch":["y","y²","2y","4xy"]},{"q":"Factor x²−7x+12","a":"(x−3)(x−4)","ch":["(x−2)(x−6)","(x−3)(x−4)","(x+3)(x+4)","(x−1)(x−12)"]},{"q":"x²+4x+4=(x+?)²","a":"2","ch":["1","2","4","8"]},{"q":"Factor 3x²+9x","a":"3x(x+3)","ch":["3x(x+3)","x(3x+9)","3(x²+3x)","9x(x+1)"]},{"q":"(x−2)(x+5)=x²+3x+?","a":"−10","ch":["10","−10","7","−7"]},{"q":"x²−8x+16=(x−?)²","a":"4","ch":["2","4","8","16"]},{"q":"Factor x²+3x−10","a":"(x+5)(x−2)","ch":["(x+5)(x−2)","(x−5)(x+2)","(x+10)(x−1)","(x+2)(x−5)"]},{"q":"(x+6)(x−6)=x²−?","a":"36","ch":["6","12","36","72"]},{"q":"Factor x²−2x−15","a":"(x−5)(x+3)","ch":["(x+5)(x−3)","(x−5)(x+3)","(x−3)(x+5)","(x−15)(x+1)"]},{"q":"Leading coeff of 3x²+2x−1?","a":"3","ch":["1","2","3","-1"]},{"q":"Degree of 4x³−2x+7?","a":"3","ch":["1","2","3","4"]}],"4":[{"q":"Is −3 an integer? Yes/No","a":"Yes","ch":["Yes","No","Sometimes","Depends"]},{"q":"(−5)+(+8)=?","a":"3","ch":["−13","−3","3","13"]},{"q":"(+6)−(+9)=?","a":"−3","ch":["−15","−3","3","15"]},{"q":"(−4)×(−7)=?","a":"28","ch":["−28","−11","11","28"]},{"q":"(−36)÷(+9)=?","a":"−4","ch":["−4","4","27","45"]},{"q":"Absolute value of −8?","a":"8","ch":["−8","0","8","64"]},{"q":"(−2)+(−5)+(+3)=?","a":"−4","ch":["−10","−4","0","4"]},{"q":"(+7)×(−6)=?","a":"−42","ch":["−42","−13","13","42"]},{"q":"(−25)÷(−5)=?","a":"5","ch":["−5","5","20","30"]},{"q":"Opposite of −11?","a":"11","ch":["−11","0","1","11"]},{"q":"(−3)²=?","a":"9","ch":["−9","6","9","12"]},{"q":"(−4)+(+10)+(−2)=?","a":"4","ch":["−16","−8","4","16"]},{"q":"(+8)×(−5)×(−1)=?","a":"40","ch":["−40","0","40","80"]},{"q":"(−72)÷(+8)=?","a":"−9","ch":["−9","9","64","80"]},{"q":"Integer between −3 and 0?","a":"−2","ch":["−4","−2","0","2"]},{"q":"(−6)−(−4)=?","a":"−2","ch":["−10","−2","2","10"]},{"q":"(+3)×(−4)×(+2)=?","a":"−24","ch":["−24","−9","9","24"]},{"q":"(−100)÷(−25)=?","a":"4","ch":["−4","4","75","125"]},{"q":"Largest: −3, −7, −1, −5?","a":"−1","ch":["−7","−5","−3","−1"]},{"q":"(−9)+(+9)=?","a":"0","ch":["−81","−18","0","18"]},{"q":"(−2)³=?","a":"−8","ch":["−8","−6","6","8"]},{"q":"(+15)−(−5)=?","a":"20","ch":["10","20","−10","−20"]},{"q":"(−3)×(+4)×(−5)=?","a":"60","ch":["−60","−12","12","60"]},{"q":"(−48)÷(+6)=?","a":"−8","ch":["−8","8","42","54"]},{"q":"Smallest: −2, 3, −5, 1?","a":"−5","ch":["−5","−2","1","3"]},{"q":"(+4)+(−11)=?","a":"−7","ch":["−15","−7","7","15"]},{"q":"(−6)²=?","a":"36","ch":["−36","12","36","72"]},{"q":"(−90)÷(−10)=?","a":"9","ch":["−9","9","80","100"]},{"q":"(−1)×(−1)×(−1)=?","a":"−1","ch":["−1","0","1","3"]},{"q":"(−5)+(−3)−(−8)=?","a":"0","ch":["−16","−6","0","16"]}],"5":[{"q":"sin(30°)=?","a":"0.5","ch":["0","0.5","√2/2","1"]},{"q":"cos(60°)=?","a":"0.5","ch":["0","0.5","√3/2","1"]},{"q":"tan(45°)=?","a":"1","ch":["0","0.5","1","√3"]},{"q":"Hypotenuse: legs 3 & 4?","a":"5","ch":["5","7","12","√7"]},{"q":"sin²x+cos²x=?","a":"1","ch":["0","0.5","1","2"]},{"q":"Hypotenuse: legs 5 & 12?","a":"13","ch":["11","13","17","√119"]},{"q":"cos(0°)=?","a":"1","ch":["0","0.5","1","undefined"]},{"q":"tan(0°)=?","a":"0","ch":["0","0.5","1","undefined"]},{"q":"Hyp=10, leg=6: other leg?","a":"8","ch":["4","6","8","10"]},{"q":"sin(90°)=?","a":"1","ch":["0","0.5","1","undefined"]},{"q":"cos(90°)=?","a":"0","ch":["0","0.5","1","undefined"]},{"q":"tan(x)=1: x=?","a":"45°","ch":["30°","45°","60°","90°"]},{"q":"Hypotenuse: legs 8 & 15?","a":"17","ch":["14","17","20","√161"]},{"q":"Right triangle with legs 6 & 8: area?","a":"24","ch":["12","24","48","100"]},{"q":"sin(x)=0.5: x=?","a":"30°","ch":["30°","45°","60°","90°"]},{"q":"cos(30°)=?","a":"√3/2","ch":["0.5","√2/2","√3/2","1"]},{"q":"Legs 7 & 24: hypotenuse?","a":"25","ch":["22","25","31","√625"]},{"q":"Perimeter: right triangle legs 3,4?","a":"12","ch":["7","12","14","25"]},{"q":"sin(60°)=?","a":"√3/2","ch":["0.5","√2/2","√3/2","1"]},{"q":"tan(30°)=?","a":"1/√3","ch":["0.5","1/√3","1","√3"]},{"q":"Legs 9 & 40: hypotenuse?","a":"41","ch":["31","41","49","√1681"]},{"q":"Area: right triangle hyp=13, leg=5?","a":"30","ch":["30","60","65","156"]},{"q":"cos(45°)=?","a":"√2/2","ch":["0.5","√2/2","√3/2","1"]},{"q":"sin²(30°)+cos²(30°)=?","a":"1","ch":["0.25","0.75","1","1.5"]},{"q":"Legs 20 & 21: hypotenuse?","a":"29","ch":["28","29","41","√841"]},{"q":"sin(x)=cos(x): x=?","a":"45°","ch":["30°","45°","60°","90°"]},{"q":"tan(60°)=?","a":"√3","ch":["0.5","1","√2","√3"]},{"q":"Legs a & b, hyp c: a²+b²=?","a":"c²","ch":["a²","b²","c²","2c"]},{"q":"Hyp=√2, legs equal: leg=?","a":"1","ch":["1","√2","2","√3"]},{"q":"sin(45°)=?","a":"√2/2","ch":["0.5","√2/2","√3/2","1"]}]}};
+
+// ── GAME STATE ──
+let GS={
+  screen:'title', playerName:'', grade:null, world:null,
+  element:null, hp:100, maxHp:100,
+  monstHp:80, maxMhp:80,
+  streak:0, combo:0, coins:0, xp:0, xpNeeded:100,
+  playerLvl:1, questions:[], qIdx:0, answered:false,
+  totalCorrect:0
+};
+
+const GR=()=>document.getElementById('gr');
+function render(html){GR().innerHTML=html;}
+
+// ── SCREENS ──────────────────────────────────────────────
+
+function showTitle(){
+  GS.screen='title';
+  MusicEngine.setTitle();
+  const stars=Array.from({length:25},(_,i)=>`<div style="position:absolute;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;background:#fff;border-radius:50%;top:${Math.random()*100}%;left:${Math.random()*100}%;animation:starTwinkle ${1.5+Math.random()*3}s ease-in-out infinite;animation-delay:${Math.random()*3}s;opacity:.3"></div>`).join('');
+  render(`<div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 30%,#1a0800,#050300);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden;">
+    ${stars}
+    <div style="background:rgba(255,140,0,0.12);border:1px solid rgba(255,140,0,0.35);border-radius:20px;padding:3px 14px;font-size:10px;color:#FF8C00;letter-spacing:2px;margin-bottom:14px;font-family:monospace">✦ REV 9 ✦</div>
+    <div style="animation:titleGlow 3s ease-in-out infinite;text-align:center;margin-bottom:6px">
+      <div style="font-size:40px;font-weight:bold;color:#FFD700;letter-spacing:3px;text-shadow:0 0 30px #FF8C00">MATH</div>
+      <div style="font-size:16px;color:#FFA040;letter-spacing:8px;margin-top:-4px">THE ELEMENTS</div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px 0;">
+      ${ELEMENTS.map((e,i)=>`<div class="elem-orb ${e.cssClass}" style="animation-delay:${i*0.3}s">${e.emoji}</div>`).join('')}
+    </div>
+    <p style="font-size:12px;color:rgba(255,228,181,0.55);text-align:center;margin-bottom:26px;font-style:italic;letter-spacing:1px">Master the elements. Command the numbers.</p>
+    <button onclick="showNameEntry()" style="background:linear-gradient(135deg,#C85000,#8B2000);color:#FFE4B5;padding:14px 48px;border-radius:30px;font-size:17px;letter-spacing:2px;box-shadow:0 0 30px rgba(255,100,0,0.5);animation:pulse 2s ease-in-out infinite;border:1px solid rgba(255,160,0,0.4)">⚔️ BEGIN QUEST</button>
+    <div style="position:absolute;bottom:14px;font-size:10px;color:rgba(255,228,181,0.25);letter-spacing:1px">GRADES 3–7 · ALL ELEMENTS · 🔊 MUSIC</div>
+  </div>`);
+}
+
+function showNameEntry(){
+  GS.screen='name';
+  render(`<div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 30%,#1a0800,#050300);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;gap:18px">
+    <div style="font-size:28px">🧙</div>
+    <div style="font-size:22px;color:#FFD700;letter-spacing:2px;text-align:center">WHAT IS YOUR NAME?</div>
+    <p style="font-size:13px;color:rgba(255,228,181,0.55);text-align:center">Your legend begins here, brave adventurer.</p>
+    <input id="nameInput" type="text" maxlength="16" placeholder="Enter your name..."
+      style="background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.35);border-radius:12px;color:#FFE4B5;font-size:18px;padding:14px 20px;text-align:center;width:100%;max-width:300px;letter-spacing:1px;"
+      onkeydown="if(event.key==='Enter')confirmName()">
+    <button onclick="confirmName()" style="background:linear-gradient(135deg,#C85000,#8B2000);color:#FFE4B5;padding:13px 40px;border-radius:28px;font-size:16px;letter-spacing:1px;box-shadow:0 0 20px rgba(200,80,0,0.4);border:1px solid rgba(255,160,0,0.3)">✨ ENTER THE REALM</button>
+    <button onclick="showTitle()" style="background:transparent;color:rgba(255,228,181,0.4);font-size:13px;margin-top:4px">← Back</button>
+  </div>`);
+  setTimeout(()=>{ const i=document.getElementById('nameInput'); if(i) i.focus(); },100);
+}
+
+function confirmName(){
+  const inp=document.getElementById('nameInput');
+  const name=(inp?inp.value.trim():'') || 'Adventurer';
+  GS.playerName=name;
+  showGradeSelect();
+}
+
+function showGradeSelect(){
+  GS.screen='grade';
+  const grades=[3,4,5,6,7];
+  const icons=['📚','📖','🔢','📐','🧮'];
+  const diff=['⭐☆☆','⭐⭐☆','⭐⭐☆','⭐⭐⭐','⭐⭐⭐'];
+  render(`<div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 20%,#1a0800,#050300);display:flex;flex-direction:column;align-items:center;padding:28px 20px;overflow-y:auto">
+    <button onclick="showNameEntry()" style="align-self:flex-start;background:transparent;color:rgba(255,228,181,0.45);font-size:20px;margin-bottom:16px">←</button>
+    <div style="font-size:13px;color:rgba(255,228,181,0.5);margin-bottom:4px">Welcome, <span style="color:#FFD700">${GS.playerName}</span>!</div>
+    <div style="font-size:22px;color:#FFD700;letter-spacing:2px;margin-bottom:4px">SELECT GRADE</div>
+    <div style="font-size:11px;color:rgba(255,228,181,0.4);margin-bottom:24px;letter-spacing:1px">Choose your realm of knowledge</div>
+    <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:300px">
+      ${grades.map((g,i)=>`<button onclick="showElementSelect(${g})" style="background:linear-gradient(135deg,rgba(180,80,0,0.25),rgba(100,40,0,0.25));border:1px solid rgba(255,160,0,0.28);color:#FFE4B5;padding:15px 18px;border-radius:14px;font-size:15px;text-align:left;letter-spacing:1px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:22px">${icons[i]}</span><span>Grade ${g}</span><span style="margin-left:auto;font-size:12px;color:rgba(255,228,181,0.35)">${diff[i]}</span>
+      </button>`).join('')}
+    </div>
+  </div>`);
+}
+
+function showElementSelect(grade){
+  GS.grade=grade;
+  GS.screen='element';
+  render(`<div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 20%,#1a0800,#050300);display:flex;flex-direction:column;align-items:center;padding:20px 16px;overflow-y:auto">
+    <button onclick="showGradeSelect()" style="align-self:flex-start;background:transparent;color:rgba(255,228,181,0.45);font-size:20px;margin-bottom:12px">←</button>
+    <div style="font-size:20px;color:#FFD700;letter-spacing:2px;margin-bottom:3px">CHOOSE ELEMENT</div>
+    <div style="font-size:11px;color:rgba(255,228,181,0.4);margin-bottom:16px;letter-spacing:1px">Grade ${grade} · Each element has 5 worlds</div>
+    <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:360px">
+      ${ELEMENTS.map(e=>`<button onclick="showWorldSelect('${e.id}')"
+        style="background:${e.bg};border:1px solid ${e.color}44;border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:12px;color:#FFE4B5;text-align:left;transition:all 0.2s">
+        <div class="elem-orb ${e.cssClass}" style="width:46px;height:46px;font-size:18px;flex-shrink:0">${e.emoji}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:bold;color:${e.color};letter-spacing:1px">${e.name} — ${e.power}</div>
+          <div style="font-size:11px;color:${e.color}99;margin-top:2px">${e.trait}</div>
+          <div style="font-size:10px;color:rgba(255,228,181,0.45);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.desc}</div>
+        </div>
+      </button>`).join('')}
+    </div>
+  </div>`);
+}
+
+function showWorldSelect(elementId){
+  GS.element=ELEMENTS.find(e=>e.id===elementId);
+  GS.screen='world';
+  const e=GS.element;
+  const worlds=WORLD_NAMES[GS.grade]||['World 1','World 2','World 3','World 4','World 5'];
+  const worldEmojis=['🏛️','💎','⛰️','🌀','🏔️'];
+  render(`<div style="width:100%;height:100%;background:${e.bg};display:flex;flex-direction:column;align-items:center;padding:24px 16px;overflow-y:auto">
+    <button onclick="showElementSelect(${GS.grade})" style="align-self:flex-start;background:transparent;color:${e.color}88;font-size:20px;margin-bottom:14px">←</button>
+    <div class="elem-orb ${e.cssClass}" style="width:56px;height:56px;font-size:26px;margin-bottom:10px">${e.emoji}</div>
+    <div style="font-size:20px;color:${e.color};letter-spacing:2px;margin-bottom:2px">${e.name.toUpperCase()} REALM</div>
+    <div style="font-size:11px;color:${e.color}66;margin-bottom:6px">Guardian: <span style="color:${e.color}aa">${e.guardianName}</span></div>
+    <div style="font-size:11px;color:${e.color}55;margin-bottom:20px">Grade ${GS.grade} · Choose a world</div>
+    <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:300px">
+      ${worlds.map((w,i)=>`<button onclick="startGame(${i+1})" style="background:rgba(0,0,0,0.4);border:1px solid ${e.color}33;border-radius:12px;padding:14px 16px;color:${e.color};font-size:14px;display:flex;align-items:center;gap:10px;letter-spacing:1px">
+        <span style="font-size:20px">${worldEmojis[i]}</span>
+        <span>${w}</span>
+        <span style="margin-left:auto;font-size:11px;color:${e.color}55">${'⚔️'.repeat(Math.ceil((i+1)/2))}</span>
+      </button>`).join('')}
+    </div>
+  </div>`);
+}
+
+function startGame(world){
+  GS.world=world;
+  GS.screen='battle';
+  GS.hp=100; GS.maxHp=100;
+  GS.monstHp=60+world*20; GS.maxMhp=GS.monstHp;
+  GS.streak=0; GS.combo=0; GS.coins=0; GS.xp=0;
+  GS.xpNeeded=100; GS.playerLvl=1; GS.totalCorrect=0;
+  const pool=ALL_QUESTIONS[String(GS.grade)]?.[String(world)]||ALL_QUESTIONS[String(GS.grade)]?.['1']||[];
+  GS.questions=[...pool].sort(()=>Math.random()-0.5);
+  GS.qIdx=0; GS.answered=false;
+  MusicEngine.setBattle();
+  showBattle();
+}
+
+function showBattle(){
+  const e=GS.element;
+  const q=GS.questions[GS.qIdx];
+  if(!q){showVictory();return;}
+  GS.answered=false;
+
+  const hpPct=Math.max(0,(GS.hp/GS.maxHp)*100);
+  const mhpPct=Math.max(0,(GS.monstHp/GS.maxMhp)*100);
+  const xpPct=Math.min(100,(GS.xp/GS.xpNeeded)*100);
+  const hpColor=hpPct>60?'#4CAF50':hpPct>30?'#FF9800':'#f44336';
+  const mhpColor=mhpPct>60?'#f44336':mhpPct>30?'#FF9800':'#4CAF50';
+  const shuffled=[...q.ch].sort(()=>Math.random()-0.5);
+  const worldName=(WORLD_NAMES[GS.grade]||[])[GS.world-1]||`World ${GS.world}`;
+
+  render(`<div style="width:100%;height:100%;background:${e.bg};display:flex;flex-direction:column;overflow:hidden;position:relative" id="battleRoot">
+    <!-- Top bar -->
+    <div style="padding:8px 12px;background:rgba(0,0,0,0.55);border-bottom:1px solid ${e.color}22;flex-shrink:0">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <div style="font-size:10px;color:${e.color}88">${e.emoji} ${e.name} · ${worldName} · Q${GS.qIdx+1}/${GS.questions.length}</div>
+        <div style="font-size:10px;color:#FFD700">🪙${GS.coins} ⚡Lv${GS.playerLvl}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">
+        <span style="font-size:9px;color:#FFE4B5;width:18px">${e.emoji}</span>
+        <div class="hbar-track" style="flex:1"><div class="hbar-fill" style="width:${hpPct}%;background:linear-gradient(90deg,${hpColor},${hpColor}88)"></div><span class="hbar-txt">${GS.hp}/${GS.maxHp}</span></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px">
+        <span style="font-size:9px;color:${e.color};width:18px">XP</span>
+        <div class="hbar-track" style="flex:1;height:6px"><div class="hbar-fill" style="width:${xpPct}%;background:${e.color}88"></div></div>
+      </div>
+    </div>
+
+    <!-- Arena -->
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:8px 10px;min-height:0;overflow:hidden">
+      <!-- Monster HP -->
+      <div style="width:100%;max-width:320px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+          <span style="font-size:10px;color:rgba(255,100,100,0.8)">${e.monsterEmoji||'👾'} ${e.monsterName}</span>
+          <span style="font-size:10px;color:rgba(255,100,100,0.8)">${GS.monstHp}/${GS.maxMhp}</span>
+        </div>
+        <div class="hbar-track"><div class="hbar-fill" style="width:${mhpPct}%;background:linear-gradient(90deg,${mhpColor},${mhpColor}88)"></div></div>
+      </div>
+
+      <!-- Sprites row -->
+      <div style="display:flex;justify-content:space-around;align-items:flex-end;width:100%;padding:0 8px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+          <div style="width:68px;height:78px;animation:guardianFloat 2s ease-in-out infinite;filter:drop-shadow(0 0 10px ${e.color})">${SPRITES[e.guardianSprite]||''}</div>
+          <div style="font-size:9px;color:${e.color}99;max-width:80px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${GS.playerName}</div>
+          ${GS.combo>1?`<div style="font-size:9px;color:#FFD700;animation:pulse 0.6s ease-in-out infinite">🔥×${GS.combo}</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+          <div class="elem-orb ${e.cssClass}" style="width:30px;height:30px;font-size:12px">${e.emoji}</div>
+          <div style="font-size:8px;color:${e.color}66;letter-spacing:2px">VS</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+          <div style="width:68px;height:78px;animation:monsterBob 2.2s ease-in-out infinite;transform:scaleX(-1);filter:drop-shadow(0 0 8px rgba(255,80,80,0.6))">${SPRITES[e.monsterSprite]||''}</div>
+          <div style="font-size:9px;color:rgba(255,100,100,0.7);max-width:80px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.monsterName}</div>
+        </div>
+      </div>
+
+      <!-- Streak -->
+      ${GS.streak>0?`<div style="font-size:11px;color:#FFD700;animation:pulse 1s ease-in-out infinite">${'⭐'.repeat(Math.min(GS.streak,5))} Streak: ${GS.streak}</div>`:'<div style="height:16px"></div>'}
+
+      <!-- Question card -->
+      <div style="background:rgba(0,0,0,0.55);border:1px solid ${e.color}33;border-radius:14px;padding:12px 16px;width:100%;max-width:340px;text-align:center">
+        <div style="font-size:11px;color:${e.color}88;margin-bottom:5px;letter-spacing:1px">QUESTION ${GS.qIdx+1} OF ${GS.questions.length}</div>
+        <div style="font-size:17px;color:#FFE4B5;line-height:1.4;min-height:36px;display:flex;align-items:center;justify-content:center">${q.q}</div>
+      </div>
+
+      <!-- Answers -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%;max-width:340px">
+        ${shuffled.map((ch,i)=>`<button id="ans_${i}" onclick="checkAnswer(this,'${ch.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${q.a.replace(/'/g,"\\'").replace(/"/g,'&quot;')}',${i})"
+          style="background:rgba(${['80,0,0','0,40,80','10,50,10','50,40,0'][i]},0.7);border:1px solid ${e.color}22;border-radius:11px;color:#FFE4B5;padding:11px 6px;font-size:13px;line-height:1.2;box-shadow:0 2px 8px rgba(0,0,0,0.3);transition:all 0.15s">
+          ${ch}
+        </button>`).join('')}
+      </div>
+
+      <!-- Retreat button (bigger) -->
+      <button onclick="confirmFlee()" style="margin-top:4px;background:rgba(255,228,181,0.08);border:1px solid rgba(255,228,181,0.18);border-radius:20px;color:rgba(255,228,181,0.55);font-size:13px;letter-spacing:1px;padding:8px 24px">
+        ↩ Retreat
+      </button>
+    </div>
+  </div>`);
+}
+
+function checkAnswer(btn, chosen, correct, idx){
+  if(GS.answered) return;
+  GS.answered=true;
+  const isCorrect=chosen===correct;
+  if(isCorrect){
+    GS.streak++; GS.combo++;
+    const dmg=15+(GS.combo>1?GS.combo*3:0);
+    GS.monstHp=Math.max(0,GS.monstHp-dmg);
+    GS.xp+=10+GS.streak*2; GS.coins+=3+GS.streak;
+    GS.totalCorrect++;
+    if(GS.xp>=GS.xpNeeded){GS.playerLvl++;GS.xp=0;GS.xpNeeded=Math.floor(GS.xpNeeded*1.3);}
+    btn.style.background='rgba(0,150,0,0.75)';
+    btn.style.border='2px solid #4CAF50';
+    btn.style.transform='scale(1.04)';
+    showFloatText('+'+dmg+'⚔️','#FFD700');
+  } else {
+    GS.streak=0; GS.combo=0;
+    GS.hp=Math.max(0,GS.hp-18);
+    btn.style.background='rgba(180,0,0,0.75)';
+    btn.style.border='2px solid #f44336';
+    document.querySelectorAll('[id^="ans_"]').forEach(b=>{
+      if(b.textContent.trim()===correct){b.style.background='rgba(0,120,0,0.75)';b.style.border='2px solid #4CAF50';}
+    });
+    showFloatText('-18❤️','#f44336');
+    const root=document.getElementById('battleRoot');
+    if(root){root.style.animation='shake 0.4s ease';setTimeout(()=>{if(root)root.style.animation='';},400);}
+  }
+  document.querySelectorAll('[id^="ans_"]').forEach(b=>{b.onclick=null;b.style.cursor='default';});
+  setTimeout(()=>{
+    if(GS.hp<=0){showDefeat();return;}
+    if(GS.monstHp<=0){showVictory();return;}
+    GS.qIdx++;
+    if(GS.qIdx>=GS.questions.length){showVictory();return;}
+    showBattle();
+  },isCorrect?900:1200);
+}
+
+function showFloatText(txt,color){
+  const d=document.createElement('div');
+  d.style.cssText=`position:fixed;top:42%;left:50%;transform:translate(-50%,-50%);font-size:26px;font-weight:bold;color:${color};pointer-events:none;z-index:999;animation:dmgFloat 0.9s ease forwards;text-shadow:0 2px 8px rgba(0,0,0,0.8)`;
+  d.textContent=txt;
+  document.body.appendChild(d);
+  setTimeout(()=>d.remove(),900);
+}
+
+function showVictory(){
+  const e=GS.element;
+  const stars=GS.hp>70?3:GS.hp>40?2:1;
+  const worldName=(WORLD_NAMES[GS.grade]||[])[GS.world-1]||`World ${GS.world}`;
+  render(`<div style="width:100%;height:100%;background:${e.bg};display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden">
+    <div style="font-size:52px;animation:bounce 0.6s ease-in-out infinite;margin-bottom:8px">🏆</div>
+    <div style="font-size:26px;color:#FFD700;letter-spacing:3px;margin-bottom:4px">VICTORY!</div>
+    <div style="font-size:13px;color:${e.color};margin-bottom:16px">${e.emoji} ${worldName} Cleared!</div>
+    <div style="font-size:34px;margin-bottom:16px">${'⭐'.repeat(stars)}${'☆'.repeat(3-stars)}</div>
+    <div style="background:rgba(0,0,0,0.4);border:1px solid ${e.color}33;border-radius:14px;padding:16px 24px;margin-bottom:20px;text-align:center;min-width:220px">
+      <div style="font-size:12px;color:${e.color}88;margin-bottom:10px;letter-spacing:1px">BATTLE RESULTS — ${GS.playerName}</div>
+      <div style="display:flex;justify-content:space-between;gap:20px;font-size:13px;color:#FFE4B5">
+        <span>❤️ ${GS.hp}/${GS.maxHp}</span>
+        <span>🪙 ${GS.coins}</span>
+        <span>✅ ${GS.totalCorrect}</span>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:#FFE4B5">⚡ Player Lv: ${GS.playerLvl}</div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+      <button onclick="startGame(${Math.min(5,GS.world+1)})" style="background:linear-gradient(135deg,${e.darkColor},rgba(0,0,0,0.5));border:1px solid ${e.color}44;color:${e.color};padding:11px 20px;border-radius:22px;font-size:13px">⚔️ Next World</button>
+      <button onclick="showWorldSelect('${e.id}')" style="background:rgba(0,0,0,0.4);border:1px solid ${e.color}22;color:${e.color}88;padding:11px 20px;border-radius:22px;font-size:13px">🗺️ World Map</button>
+      <button onclick="showTitle()" style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,228,181,0.12);color:rgba(255,228,181,0.35);padding:11px 20px;border-radius:22px;font-size:13px">🏠 Home</button>
+    </div>
+  </div>`);
+}
+
+function showDefeat(){
+  const e=GS.element;
+  render(`<div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 40%,#2a0000,#050300);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px">
+    <div style="font-size:54px;margin-bottom:12px;animation:shake 0.5s ease-in-out infinite">💀</div>
+    <div style="font-size:24px;color:#f44336;letter-spacing:3px;margin-bottom:8px">DEFEATED</div>
+    <div style="font-size:13px;color:rgba(255,228,181,0.5);margin-bottom:28px;text-align:center">The elements were too strong, ${GS.playerName}...<br>Train harder and return!</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+      <button onclick="startGame(${GS.world})" style="background:linear-gradient(135deg,#8B0000,#4a0000);border:1px solid #f4433644;color:#FFE4B5;padding:12px 22px;border-radius:24px;font-size:14px">🔄 Try Again</button>
+      <button onclick="showTitle()" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,228,181,0.14);color:rgba(255,228,181,0.4);padding:12px 22px;border-radius:24px;font-size:14px">🏠 Home</button>
+    </div>
+  </div>`);
+}
+
+function confirmFlee(){
+  const e=GS.element;
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;z-index:1000';
+  ov.innerHTML=`<div style="background:#1a1000;border:1px solid ${e.color}44;border-radius:16px;padding:26px;text-align:center;margin:20px">
+    <div style="font-size:16px;color:#FFE4B5;margin-bottom:16px">Retreat from battle?</div>
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button onclick="this.closest('[style*=fixed]').remove();showWorldSelect('${e.id}')" style="background:#8B0000;color:#FFE4B5;padding:10px 20px;border-radius:20px;font-size:14px">Yes, Retreat</button>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="background:rgba(255,255,255,0.1);color:#FFE4B5;padding:10px 20px;border-radius:20px;font-size:14px">Keep Fighting</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+// ── BOOT ──
+showTitle();
+</script>
+</body>
+</html>
