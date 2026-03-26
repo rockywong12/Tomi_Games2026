@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <!-- Suggest landscape orientation to browsers that honour it -->
+  <meta name="screen-orientation" content="landscape" />
+  <title>Geo Blitz! 🎮</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ══════════════════════════════════════ ROTATE OVERLAY (portrait) ══════ -->
+<div id="rotate-overlay">
+  <div class="rotate-icon">📱</div>
+  <h2>Rotate Your Device!</h2>
+  <p>Geo Blitz! plays in landscape mode.<br/>Turn your phone sideways for the best experience.</p>
+</div>
+
+<div id="app">
+
+  <!-- ════════════════════════════════════════════════════ MAIN MENU ══════ -->
+  <div id="screen-menu" class="screen">
+    <div class="menu-bg-circles">
+      <span></span><span></span><span></span>
+    </div>
+    <div class="menu-logo">
+      <span class="menu-logo-icon">⚡</span>
+      <h1>Geo<br/><span>Blitz!</span></h1>
+      <p>Jump, fly &amp; dodge your way to glory!</p>
+    </div>
+    <div class="menu-buttons">
+      <button id="btn-play"  class="btn btn-primary">▶ Play</button>
+      <button id="btn-reset" class="btn btn-danger">↺ Reset Progress</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ CHARACTER SELECT ══════ -->
+  <div id="screen-char-select" class="screen">
+    <div class="screen-header">
+      <button id="btn-char-back" class="btn btn-back">← Back</button>
+      <span class="screen-title">Pick Your Hero!</span>
+    </div>
+    <div id="char-desc" class="char-desc-box">Select a character to see their ability.</div>
+    <div id="char-grid"></div>
+    <div class="char-footer">
+      <button id="btn-char-go" class="btn btn-primary" style="width:100%">Let's Go! →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════ WORLD MAP ══════ -->
+  <div id="screen-world-map" class="screen">
+    <div class="screen-header">
+      <button id="btn-world-back" class="btn btn-back">← Back</button>
+      <span class="screen-title">Choose a World!</span>
+    </div>
+    <div id="world-cards"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════ LEVEL SELECT ══════ -->
+  <div id="screen-level-select" class="screen">
+    <div class="screen-header">
+      <button id="btn-level-back" class="btn btn-back">← Back</button>
+      <span id="level-world-title" class="screen-title"></span>
+    </div>
+    <div id="level-grid"></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ GAME ══════ -->
+  <div id="screen-game" class="screen">
+    <canvas id="gameCanvas"></canvas>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════ RESULTS ══════ -->
+  <div id="screen-results" class="screen">
+    <div class="results-inner">
+      <div class="result-trophy">🏆</div>
+      <div id="result-level-name">Level Name</div>
+      <div id="result-stars">
+        <span class="star empty">★</span><span class="star empty">★</span>
+        <span class="star empty">★</span><span class="star empty">★</span>
+        <span class="star empty">★</span>
+      </div>
+      <div id="result-msg">Great job!</div>
+      <div id="result-deaths">💀 Deaths: 0</div>
+      <div class="result-buttons">
+        <button id="btn-result-next"  class="btn btn-primary">Next ▶</button>
+        <button id="btn-result-retry" class="btn btn-secondary">↺ Retry</button>
+        <button id="btn-result-menu"  class="btn btn-secondary">🗺 Worlds</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#app -->
+
+<!-- Scripts — load order matters -->
+<script src="js/storage.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/characters.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
