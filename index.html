@@ -354,6 +354,12 @@
 
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(20px); }
+    .btn-geo { background: linear-gradient(135deg, #003a8c, #001a44); color: var(--cream); padding: 15px 40px; border-radius: 32px; font-family: 'Cinzel', serif; font-size: 0.85rem; font-weight: 600; letter-spacing: 2px; text-decoration: none; border: 1px solid rgba(100,180,255,0.4); box-shadow: 0 0 30px rgba(0,100,255,0.35); transition: all 0.25s; display: inline-block; }
+    .btn-geo:hover { transform: translateY(-2px); box-shadow: 0 0 50px rgba(80,160,255,0.6); color: #B3E5FC; }
+    .game-card-geo { background: radial-gradient(ellipse at 30% 20%, rgba(0,80,200,0.12), transparent 60%), rgba(255,215,0,0.03); border: 1px solid rgba(80,160,255,0.2); }
+    .game-card-geo:hover { border-color: rgba(80,160,255,0.45); box-shadow: 0 20px 60px rgba(0,80,200,0.2); }
+    .game-card-badge-geo { background: rgba(0,120,255,0.2); border: 1px solid rgba(80,160,255,0.4); color: #90CAF9; }
+    .game-card .btn-geo { width: 100%; text-align: center; padding: 12px 24px; font-size: 0.75rem; }
       to   { opacity: 1; transform: translateY(0); }
     }
 
@@ -847,7 +853,10 @@
 
       <div class="cta-group">
         <a href="https://rockywong12.github.io/Tomi_Games2026/MathTheElements_9.html" class="btn-primary" aria-label="Play Math: The Elements now">
-          ⚔️ Play Now — It's Free
+          ⚔️ Math: The Elements
+        </a>
+        <a href="https://rockywong12.github.io/Tomi_Games2026/geometry-kids/index.html" class="btn-geo" aria-label="Play Geo Blitz">
+          ⚡ Geo Blitz!
         </a>
         <a href="#games" class="btn-secondary" aria-label="See all games">
           Explore All Games
@@ -916,7 +925,7 @@
       <div class="divider" aria-hidden="true"></div>
       <h2 class="section-title" id="games-title">Games by Tomi</h2>
       <p class="section-lead">
-        Each game is hand-crafted with love and designed to make math less scary — and a lot more fun.
+        Each game is hand-crafted with love and designed to make learning fun — whether you're solving math problems or dodging obstacles at full speed.
       </p>
 
       <div class="games-grid">
@@ -945,23 +954,26 @@
           </a>
         </article>
 
-        <!-- Game Card 2 — Placeholder for future game -->
-        <article class="game-card" style="opacity:0.5; pointer-events:none;" aria-hidden="true">
-          <span class="game-card-badge">COMING SOON</span>
-          <span class="game-card-icon" aria-hidden="true">🔮</span>
-          <h3 class="game-card-title">Next Adventure</h3>
-          <p class="game-card-sub">MORE GAMES IN THE WORKS</p>
+        <!-- Game Card 2 — Geo Blitz -->
+        <article class="game-card game-card-geo">
+          <span class="game-card-badge game-card-badge-geo">NEW ✦ 2026</span>
+          <span class="game-card-icon" aria-hidden="true">⚡</span>
+          <h3 class="game-card-title">Geo Blitz!</h3>
+          <p class="game-card-sub">ALL AGES · BROWSER GAME</p>
           <p class="game-card-desc">
-            Tomi is already working on the next game. Follow rockywong.com to be the first
-            to know when new adventures drop. Stay tuned — something magical is coming.
+            A fast-paced obstacle-dodging game inspired by Geometry Dash! Run, jump, and fly through 20 handcrafted levels across 4 themed worlds — Candy Kingdom, Space Adventure, Ocean Deep, and Volcano Island. Choose from 6 unique characters and blast to the finish!
           </p>
-          <div class="game-tags">
-            <span class="tag">Coming 2026</span>
-            <span class="tag">Stay Tuned</span>
+          <div class="game-tags" aria-label="Game features">
+            <span class="tag">20 Levels</span>
+            <span class="tag">4 Worlds</span>
+            <span class="tag">6 Characters</span>
+            <span class="tag">Obstacle Dash</span>
+            <span class="tag">All Ages</span>
+            <span class="tag">Free</span>
           </div>
-          <span class="btn-primary" style="opacity:0.5; display:inline-block; text-align:center; width:100%; padding:12px 24px; font-size:0.75rem;">
-            🔮 Coming Soon
-          </span>
+          <a href="https://rockywong12.github.io/Tomi_Games2026/geometry-kids/index.html" class="btn-geo" aria-label="Play Geo Blitz">
+            ⚡ Play Now — Free
+          </a>
         </article>
 
       </div>
@@ -1140,6 +1152,7 @@
       <a href="#creator">About</a>
       <a href="#faq">FAQ</a>
       <a href="https://rockywong12.github.io/Tomi_Games2026/MathTheElements_9.html">Play Now</a>
+      <a href="https://rockywong12.github.io/Tomi_Games2026/geometry-kids/index.html">Geo Blitz!</a>
     </nav>
     <p class="footer-copy">© 2026 rockywong.com · Made with ❤️ by Tomi Wong · Free forever</p>
   </footer>
